@@ -1,0 +1,42 @@
+{
+  "overture_release": "2026-08-19.0",
+  "bbox": {
+    "xmin": -71.227,
+    "ymin": 42.201,
+    "xmax": -70.886,
+    "ymax": 42.431
+  },
+  "source": "s3",
+  "layers": [
+    {
+      "file": "places.parquet",
+      "rows": 80293,
+      "skipped": true
+    },
+    {
+      "file": "segments.parquet",
+      "rows": 156335,
+      "skipped": true
+    },
+    {
+      "file": "connectors.parquet",
+      "rows": 228593,
+      "skipped": true
+    },
+    {
+      "file": "buildings.parquet",
+      "rows": 355396,
+      "skipped": true
+    },
+    {
+      "file": "addresses.parquet",
+      "rows": 909328,
+      "skipped": true
+    },
+    {
+      "file": "divisions.parquet",
+      "rows": 43,
+      "skipped": true
+    }
+  ]
+}

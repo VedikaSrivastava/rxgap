@@ -1,0 +1,11 @@
+{
+  "buildings_in_cities": 120427,
+  "residential_buildings": 15581,
+  "residential_share": 0.129,
+  "num_floors_nonnull": 0.084,
+  "height_nonnull": 0.929,
+  "block_groups": 762,
+  "no_vehicle_households": 118885.0,
+  "hexes": 653,
+  "dasymetric_ok": true
+}

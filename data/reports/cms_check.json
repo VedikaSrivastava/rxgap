@@ -1,0 +1,17 @@
+{
+  "usable_as_storefront_directory": false,
+  "reason": "File is plan-level Part D retail-access adequacy, not a pharmacy address list.",
+  "columns": [
+    "Variable Name",
+    "Description",
+    "Access Notes 1",
+    "Access Notes 2"
+  ],
+  "approx_rows": 6988,
+  "zip_files": [
+    "Q1 2026 Medicare Part D Retail Pharmacy Access.csv",
+    "Q1 2026 Medicare Part D Retail Pharmacy Access.xlsx",
+    "Medicare Part D Retail Pharmay Access Analysis Technical Notes_v2.pdf"
+  ],
+  "fallback": "NPPES taxonomy 3336C0003X (Community/Retail Pharmacy)"
+}

@@ -1,0 +1,66 @@
+{
+  "nodes": 835820,
+  "undirected_edges": 940768,
+  "segments_used": 150534,
+  "components": 595,
+  "largest_component_nodes": 821118,
+  "largest_component_share": 0.9824,
+  "bridge_name_hits": {
+    "Harvard": [
+      "Harvard Avenue",
+      "Harvard Street",
+      "Harvard Terrace",
+      "Harvard Place",
+      "Harvard Circle",
+      "Harvard Court",
+      "North Harvard Street",
+      "Harvard Way"
+    ],
+    "Longfellow": [
+      "Longfellow Road",
+      "Longfellow Park",
+      "Longfellow Bridge Trophy Room",
+      "Longfellow Bridge",
+      "Longfellow Place",
+      "Longfellow Street"
+    ],
+    "BU": [
+      "Boston University Bridge"
+    ]
+  },
+  "snap_meters": {
+    "boston_city_hall": 31.0,
+    "harvard_square": 7.9,
+    "kendall": 6.0,
+    "nubian": 2.6,
+    "longfellow_boston": 22.8,
+    "longfellow_cambridge": 137.3,
+    "harvard_bridge_boston": 147.5,
+    "harvard_bridge_cambridge": 22.9,
+    "bu_boston": 3.0,
+    "bu_cambridge": 5.9,
+    "brookline_border": 1.4,
+    "somerville_border": 33.0,
+    "newton_border": 9.6
+  },
+  "routes_m": {
+    "boston_to_harvard_square_m": 5565.9,
+    "longfellow_cross_m": 677.6,
+    "harvard_bridge_cross_m": 1218.3,
+    "bu_bridge_cross_m": 874.1,
+    "boston_to_brookline_border_m": 5762.8,
+    "cambridge_to_somerville_border_m": 2652.3,
+    "boston_to_newton_border_m": 8293.2
+  },
+  "pass": {
+    "largest_component_dominant": true,
+    "boston_cambridge_connected": true,
+    "longfellow": true,
+    "harvard_bridge": true,
+    "bu_bridge": true,
+    "brookline_not_clipped": true,
+    "somerville_not_clipped": true,
+    "newton_not_clipped": true
+  },
+  "all_pass": true
+}
