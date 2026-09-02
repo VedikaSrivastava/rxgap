@@ -16,6 +16,15 @@ THEMES = (
     ("divisions", "division_area", "divisions.parquet"),
 )
 
+REQUIRED_COLUMNS = {
+    "place": {"id", "geometry", "name"},
+    "segment": {"id", "geometry", "subtype", "class", "connectors_json", "access_json"},
+    "connector": {"id", "geometry"},
+    "building": {"id", "geometry", "subtype", "class", "height", "num_floors"},
+    "address": {"id", "geometry"},
+    "division_area": {"id", "geometry", "name", "subtype"},
+}
+
 
 def _bbox_sql(mode: str = "intersect") -> str:
     b = BBOX
@@ -116,7 +125,14 @@ def extract_layer(con, theme: str, type_name: str, filename: str, azure: bool) -
         where += " AND country = 'US' AND region = 'US-MA' AND subtype IN ('locality', 'county')"
 
     if dest.exists() and dest.stat().st_size > 1000:
+        local = con.execute(f"SELECT * FROM read_parquet('{dest.as_posix()}') LIMIT 0")
+        local_cols = {d[0] for d in local.description}
+        missing = REQUIRED_COLUMNS[type_name] - local_cols
+        if missing:
+            raise RuntimeError(f"{filename} is missing columns: {sorted(missing)}")
         n = con.execute(f"SELECT count(*) FROM read_parquet('{dest.as_posix()}')").fetchone()[0]
+        if not n:
+            raise RuntimeError(f"{filename} is empty")
         return {"file": filename, "rows": int(n), "skipped": True}
 
     sql = f"""

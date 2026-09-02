@@ -15,6 +15,20 @@ export function hexAccess(
   };
 }
 
+export function weightedMedian(pairs: { value: number; weight: number }[]): number | null {
+  const rows = pairs
+    .filter((p) => p.weight > 0 && Number.isFinite(p.value))
+    .sort((a, b) => a.value - b.value);
+  const total = rows.reduce((s, r) => s + r.weight, 0);
+  if (!total) return null;
+  let acc = 0;
+  for (const row of rows) {
+    acc += row.weight;
+    if (acc >= total / 2) return row.value;
+  }
+  return rows[rows.length - 1]?.value ?? null;
+}
+
 export function impact(
   data: RxGapData,
   closedId: string | null,
@@ -23,43 +37,49 @@ export function impact(
 ) {
   let newlyHh = 0;
   let alreadyHh = 0;
-  const extraMeters: number[] = [];
-  const nextCount = new Map<string, number>();
+  const extra: { value: number; weight: number }[] = [];
+  const next = new Map<string, { households: number; extras: { value: number; weight: number }[] }>();
 
   for (const hex of data.hexes) {
     const base = hexAccess(hex, null, pace.mps);
-    const next = hexAccess(hex, closedId, pace.mps);
+    const after = hexAccess(hex, closedId, pace.mps);
     const hh = hex.households;
-    if (base.minutes != null && base.minutes > threshold) alreadyHh += hh;
+    if (base.minutes == null || base.minutes > threshold) alreadyHh += hh;
     const newly =
       Boolean(closedId) &&
       hex.nearestId === closedId &&
       base.minutes != null &&
       base.minutes <= threshold &&
-      (next.minutes == null || next.minutes > threshold);
+      (after.minutes == null || after.minutes > threshold);
     if (newly) newlyHh += hh;
     if (closedId && hex.nearestId === closedId && hex.nearestM != null && hex.secondM != null) {
-      extraMeters.push(hex.secondM - hex.nearestM);
-      if (hex.secondId) nextCount.set(hex.secondId, (nextCount.get(hex.secondId) ?? 0) + hh);
+      extra.push({ value: hex.secondM - hex.nearestM, weight: hh });
+      if (hex.secondId) {
+        const row = next.get(hex.secondId) ?? { households: 0, extras: [] };
+        row.households += hh;
+        row.extras.push({ value: hex.secondM, weight: hh });
+        next.set(hex.secondId, row);
+      }
     }
   }
 
-  extraMeters.sort((a, b) => a - b);
-  const medianExtra =
-    extraMeters.length === 0 ? null : extraMeters[Math.floor(extraMeters.length / 2)];
-
+  const medianExtra = weightedMedian(extra);
   return {
     newlyHh,
     alreadyHh,
     medianExtra,
     medianExtraMin: medianExtra == null ? null : medianExtra / pace.mps / 60,
-    alternatives: [...nextCount.entries()]
-      .sort((a, b) => b[1] - a[1])
+    alternatives: [...next.entries()]
+      .sort((a, b) => b[1].households - a[1].households)
       .slice(0, 3)
-      .map(([id, households]) => ({
-        pharmacy: data.pharmacies.find((p) => p.id === id) ?? null,
-        households,
-      })),
+      .map(([id, row]) => {
+        const meters = weightedMedian(row.extras);
+        return {
+          pharmacy: data.pharmacies.find((p) => p.id === id) ?? null,
+          households: row.households,
+          minutes: meters == null ? null : meters / pace.mps / 60,
+        };
+      }),
   };
 }
 
@@ -70,11 +90,16 @@ export function closureRank(
   threshold: number,
 ) {
   const scored = data.pharmacies
+    .filter((p) => p.inStudyArea && p.simulatable)
     .map((p) => ({ id: p.id, newlyHh: impact(data, p.id, pace, threshold).newlyHh }))
     .sort((a, b) => b.newlyHh - a.newlyHh);
   const index = scored.findIndex((row) => row.id === closedId);
   if (index < 0) return null;
   return { rank: index + 1, of: scored.length };
+}
+
+export function servedHouseholds(data: RxGapData, pharmacyId: string): number {
+  return data.hexes.reduce((sum, hex) => (hex.nearestId === pharmacyId ? sum + hex.households : sum), 0);
 }
 
 export function formatHh(n: number): string {
@@ -84,4 +109,9 @@ export function formatHh(n: number): string {
 export function formatMin(minutes: number | null): string {
   if (minutes == null) return "—";
   return `+${minutes.toFixed(1)} min`;
+}
+
+export function formatWalk(minutes: number | null): string {
+  if (minutes == null) return "—";
+  return `${Math.round(minutes)} min`;
 }

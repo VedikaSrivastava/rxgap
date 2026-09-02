@@ -15,6 +15,26 @@ OVERTURE_AZURE = (
 # Demand is clipped to these municipalities. Pharmacies and the walk graph
 # extend 3 km beyond so border neighborhoods are not artificially stranded.
 STUDY_CITIES = ("Boston", "Cambridge")
+STUDY_PLACE_NAMES = frozenset(
+    {
+        "boston",
+        "cambridge",
+        "dorchester",
+        "roxbury",
+        "jamaica plain",
+        "brighton",
+        "allston",
+        "charlestown",
+        "hyde park",
+        "mattapan",
+        "roslindale",
+        "west roxbury",
+        "east boston",
+        "south boston",
+        "mission hill",
+        "roxbury crossing",
+    }
+)
 BUFFER_KM = 3.0
 
 # Union of Boston + Cambridge bounding boxes, then expanded by BUFFER_KM.
@@ -41,7 +61,14 @@ DEFAULT_PACE = "average"
 ACCESS_THRESHOLD_MINUTES = 15
 H3_RESOLUTION = 9
 
-# NPPES taxonomy that means a person can walk in off the street.
+# Currently licensed location comes from the MA Board retail roster.
+# NPPES taxonomy is type evidence, not operating status.
+MA_LICENSE_API = "https://healthprofessionlicensing-api.mass.gov/api-public"
+MA_PHARMACY_BOARD = "BOARD_OF_REGISTRATION_IN_PHARMACY"
+MA_RETAIL_EXPORT_PREFIX = "Retail_Pharmacy_License_Export_"
+MA_ACTIVE_LICENSE_STATUSES = frozenset(
+    {"Current", "Probation", "Non-Disciplinary Condition"}
+)
 RETAIL_TAXONOMY = "3336C0003X"
 EXCLUDE_TAXONOMIES = {
     "3336M0002X",  # Mail Order Pharmacy
@@ -50,6 +77,14 @@ EXCLUDE_TAXONOMIES = {
     "3336I0012X",  # Institutional Pharmacy
     "332B00000X",  # DME only, used when it is the only taxonomy
 }
+
+# Storefronts that must never appear as active. Pipeline fails if they do.
+KNOWN_CLOSED_STOREFRONTS = (
+    {"street": "90 river", "city": "mattapan"},
+    {"street": "1329 hyde park", "city": None},
+    {"street": "2275 washington", "city": "roxbury"},
+    {"street": "416 warren", "city": "roxbury"},
+)
 
 # Overture road classes a pedestrian can typically use. Motorways are excluded;
 # walk-denied access_restrictions are filtered at extract time.
@@ -87,9 +122,12 @@ WALK_CHECKS = (
 ACS_YEAR = 2023
 ACS_DATASET = "acs/acs5"
 ACS_NO_VEHICLE = {
-    "total_occupied": "B25044_001E",
-    "owner_no_vehicle": "B25044_003E",
-    "renter_no_vehicle": "B25044_010E",
+    "total_occupied": "B25044_E001",
+    "total_occupied_moe": "B25044_M001",
+    "owner_no_vehicle": "B25044_E003",
+    "owner_no_vehicle_moe": "B25044_M003",
+    "renter_no_vehicle": "B25044_E010",
+    "renter_no_vehicle_moe": "B25044_M010",
 }
 
 ROOT = Path(__file__).resolve().parents[1]

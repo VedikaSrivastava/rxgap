@@ -6,6 +6,8 @@ import json
 import shutil
 
 import pandas as pd
+from shapely.geometry import Point, shape
+from shapely.ops import unary_union
 
 from pipeline.config import (
     ACCESS_THRESHOLD_MINUTES,
@@ -19,22 +21,74 @@ from pipeline.config import (
     OVERTURE_RELEASE,
     PACES,
     STUDY_CITIES,
+    STUDY_PLACE_NAMES,
     WEB_DATA,
     ensure_dirs,
 )
 
 
+def study_union():
+    path = DATA_PROCESSED / "cities.geojson"
+    if not path.exists():
+        return None
+    fc = json.loads(path.read_text(encoding="utf-8"))
+    return unary_union([shape(f["geometry"]) for f in fc["features"]])
+
+
+def in_study_area(row, union) -> bool:
+    if str(row.city).strip().lower() in STUDY_PLACE_NAMES:
+        return True
+    if union is None:
+        return False
+    return bool(union.covers(Point(float(row.lon), float(row.lat))))
+
+
+def as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"true", "1", "yes"}
+
+
+def zip5(value) -> str:
+    digits = "".join(c for c in str(value or "") if c.isdigit())[:5]
+    return digits.zfill(5) if digits else "00000"
+
+
+def exclude_reason(row) -> str | None:
+    if as_bool(row.in_study_area) and as_bool(row.routable):
+        return None
+    if pd.notna(getattr(row, "exclude_reason", None)) and str(row.exclude_reason).lower() not in {
+        "nan",
+        "none",
+        "",
+    }:
+        return str(row.exclude_reason)
+    if not as_bool(row.in_study_area):
+        return "Outside Boston + Cambridge study area — shown for context"
+    return "Not routable"
+
+
 def run() -> None:
     ensure_dirs()
     hexes = pd.read_csv(DATA_PROCESSED / "access.csv", dtype={"nearest_id": str, "second_id": str})
-    pharmacies = pd.read_csv(DATA_PROCESSED / "pharmacies_snapped.csv", dtype={"npi": str, "zip": str})
-    used = {str(x) for x in hexes["nearest_id"].dropna()} | {str(x) for x in hexes["second_id"].dropna()}
-    pharmacies = pharmacies[pharmacies["npi"].astype(str).isin(used)].copy()
+    licensed = pd.read_csv(DATA_PROCESSED / "pharmacies.csv", dtype={"npi": str, "zip": str, "license": str})
+    snapped = pd.read_csv(
+        DATA_PROCESSED / "pharmacies_snapped.csv",
+        dtype={"npi": str, "zip": str, "license": str},
+    )
+    snap_cols = snapped[["license", "snap_m", "routable", "exclude_reason"]].drop_duplicates("license")
+    pharmacies = licensed.merge(snap_cols, on="license", how="left")
+    pharmacies["id"] = pharmacies["license"].astype(str)
+    pharmacies["routable"] = pharmacies["routable"].map(as_bool)
+    union = study_union()
+    pharmacies["in_study_area"] = pharmacies.apply(lambda r: in_study_area(r, union), axis=1)
+
     reports = {}
     for name in ("pharmacies", "graph", "buildings_demand", "access", "cms_check", "overture_extract"):
         path = DATA_REPORTS / f"{name}.json"
         if path.exists():
             reports[name] = json.loads(path.read_text(encoding="utf-8"))
+    demand = reports.get("buildings_demand") or {}
 
     payload = {
         "meta": {
@@ -49,21 +103,25 @@ def run() -> None:
             "paces": PACES,
             "overtureRelease": OVERTURE_RELEASE,
             "acsYear": ACS_YEAR,
-            "demand": "ACS 5-year no-vehicle households (B25044), allocated onto Overture residential buildings, then aggregated to H3-9.",
-            "network": "Overture transportation segments, pedestrian-accessible classes, 3 km buffer beyond city limits.",
-            "pharmacies": "NPPES Community/Retail Pharmacy taxonomy 3336C0003X, Census-geocoded and matched to Overture places. CMS Q1 2026 Retail Pharmacy Access is plan-level adequacy, not a storefront directory, so it was not used as identity.",
+            "noVehicleHouseholds": demand.get("no_vehicle_households"),
+            "noVehicleMoe": demand.get("no_vehicle_moe"),
+            "demand": "ACS 5-year no-vehicle households (B25044) with margins of error, allocated to residential-classified Overture buildings with block-group fallbacks, then aggregated to H3-9.",
+            "network": "Overture transportation segments joined on connector_id, pedestrian-accessible classes, 3 km buffer beyond city limits. Distances include origin and destination snap legs.",
+            "pharmacies": "Currently licensed MA Board Retail Pharmacies with usable geocodes in the analysis bbox. Walk-in storefronts are used for routing; excluded licenses still appear with a reason.",
             "reports": reports,
         },
         "pharmacies": [
             {
-                "id": str(r.npi),
+                "id": str(r.id),
                 "name": r.name,
-                "address": f"{r.address}, {r.city} MA {str(r.zip).split('.')[0].zfill(5)}",
+                "address": f"{r.address}, {r.city} MA {zip5(r.zip)}",
                 "city": r.city,
                 "lat": float(r.lat),
                 "lon": float(r.lon),
                 "confidence": getattr(r, "confidence", "medium"),
-                "cmsRetail": bool(getattr(r, "cms_retail", False)),
+                "inStudyArea": bool(r.in_study_area),
+                "simulatable": bool(r.in_study_area and r.routable),
+                "excludeReason": exclude_reason(r),
             }
             for r in pharmacies.itertuples(index=False)
         ],
@@ -86,7 +144,13 @@ def run() -> None:
     cities = DATA_PROCESSED / "cities.geojson"
     if cities.exists():
         shutil.copyfile(cities, WEB_DATA / "cities.geojson")
-    print(f"Wrote {WEB_DATA / 'rxgap.json'} ({len(payload['hexes'])} hexes, {len(payload['pharmacies'])} pharmacies)")
+    study_n = sum(1 for p in payload["pharmacies"] if p["inStudyArea"])
+    sim_n = sum(1 for p in payload["pharmacies"] if p["simulatable"])
+    print(
+        f"Wrote {WEB_DATA / 'rxgap.json'} "
+        f"({len(payload['hexes'])} hexes, {len(payload['pharmacies'])} pharmacies, "
+        f"{study_n} in study area, {sim_n} simulatable)"
+    )
 
 
 if __name__ == "__main__":

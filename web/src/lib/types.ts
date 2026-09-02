@@ -16,7 +16,9 @@ export type Pharmacy = {
   lat: number;
   lon: number;
   confidence: string;
-  cmsRetail: boolean;
+  inStudyArea: boolean;
+  simulatable: boolean;
+  excludeReason: string | null;
 };
 
 export type Hex = {
@@ -42,6 +44,8 @@ export type RxGapData = {
     paces: Record<PaceId, Pace>;
     overtureRelease: string;
     acsYear: number;
+    noVehicleHouseholds?: number;
+    noVehicleMoe?: number;
     demand: string;
     network: string;
     pharmacies: string;

@@ -1,11 +1,20 @@
 {
-  "nppes_in_bbox": 220,
-  "cms_overlap": 0,
-  "overture_matched": 160,
-  "review_needed": 60,
+  "source": "MA Board of Registration in Pharmacy, currently licensed Retail Pharmacy",
+  "board_active_ma": 1036,
+  "census_unmatched": 99,
+  "nppes_geocode_backfilled": 1,
+  "overture_address_backfilled": 9,
+  "local_nominatim_backfilled": 3,
+  "local_geocode_unresolved": [],
+  "licensed_geocoded_in_bbox": 223,
+  "walk_in_storefronts": 214,
+  "display_only": 9,
+  "nppes_taxonomy_matched": 171,
+  "overture_matched": 164,
+  "nominatim_refined": 53,
+  "known_closed_active": 0,
   "study_cities": [
     "Boston",
     "Cambridge"
-  ],
-  "pct_cms": 0.0
+  ]
 }

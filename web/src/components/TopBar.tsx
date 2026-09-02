@@ -27,7 +27,7 @@ export function TopBar({
     const list = data.pharmacies.filter(
       (p) => !q || `${p.name} ${p.address} ${p.city}`.toLowerCase().includes(q),
     );
-    return list.slice(0, 8);
+    return list.slice(0, 10);
   }, [data.pharmacies, q]);
 
   return (
@@ -35,6 +35,7 @@ export function TopBar({
       <div className="brand">
         <strong>RxGap</strong>
         <span>Boston · Cambridge</span>
+        <p>Pick a store and see who loses a short walk if it closes.</p>
       </div>
 
       <div className="ask">
@@ -66,7 +67,9 @@ export function TopBar({
                   }}
                 >
                   <b>{p.name}</b>
-                  <span>{p.address}</span>
+                  <span>
+                    {p.simulatable ? p.address : (p.excludeReason ?? "Cannot simulate closure")}
+                  </span>
                 </button>
               </li>
             ))}
@@ -75,15 +78,18 @@ export function TopBar({
       </div>
 
       <div className="toggles">
-        <div className="seg" role="group" aria-label="Walking pace">
-          {(Object.keys(data.meta.paces) as PaceId[]).map((id) => (
-            <button key={id} className={id === paceId ? "is-on" : ""} onClick={() => onPace(id)}>
-              {data.meta.paces[id].label}
-            </button>
-          ))}
-        </div>
+        <label className="pace">
+          Walk
+          <select value={paceId} onChange={(e) => onPace(e.target.value as PaceId)}>
+            {(Object.keys(data.meta.paces) as PaceId[]).map((id) => (
+              <option key={id} value={id}>
+                {data.meta.paces[id].label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="mins">
-          <span>{threshold} min</span>
+          Too far after {threshold} min
           <input
             type="range"
             min={10}

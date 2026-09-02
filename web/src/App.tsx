@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MapView } from "./components/MapView";
 import { SidePanel } from "./components/SidePanel";
 import { TopBar } from "./components/TopBar";
-import { impact } from "./lib/metrics";
+import { formatHh, impact } from "./lib/metrics";
 import type { PaceId, RxGapData } from "./lib/types";
 
 export default function App() {
@@ -32,11 +32,10 @@ export default function App() {
 
   const selected = data.pharmacies.find((p) => p.id === selectedId) ?? null;
   const pace = data.meta.paces[paceId];
+  const stats = impact(data, simulating ? selected?.id ?? null : null, pace, threshold);
   const altIds =
     selected && simulating
-      ? impact(data, selected.id, pace, threshold)
-          .alternatives.map((a) => a.pharmacy?.id)
-          .filter((id): id is string => Boolean(id))
+      ? stats.alternatives.map((a) => a.pharmacy?.id).filter((id): id is string => Boolean(id))
       : [];
 
   return (
@@ -58,8 +57,6 @@ export default function App() {
           data={data}
           selectedId={selectedId}
           simulating={simulating}
-          pace={pace}
-          threshold={threshold}
           altIds={altIds}
           onSelect={(id) => {
             setSelectedId(id);
@@ -82,18 +79,31 @@ export default function App() {
           />
         )}
         {!selected && (
-          <p className="hint">Click a pharmacy to see what happens if it disappears.</p>
+          <p className="hint">Pick a pharmacy on the map, then simulate what happens if it closes.</p>
         )}
         <div className="legend">
           <span>
             <i className="swatch ink" /> pharmacy
           </span>
+          {simulating && (
+            <>
+              <span>
+                <i className="swatch coral" /> closing
+              </span>
+              <span>
+                <i className="swatch teal" /> next closest
+              </span>
+            </>
+          )}
           <span>
-            <i className="swatch teal" /> within {threshold} min
+            <i className="swatch gray" /> can&apos;t simulate
           </span>
-          <span>
-            <i className="swatch coral" /> {simulating ? "newly lost" : "already far"}
-          </span>
+          <p>
+            Numbered circles are groups of stores — zoom in to see each one. A walk
+            over {threshold} min (at {pace.label.toLowerCase()} pace) counts as too far.
+            Today, about {formatHh(stats.alreadyHh)} no-vehicle households in Boston and
+            Cambridge are already past that.
+          </p>
         </div>
       </div>
     </div>
