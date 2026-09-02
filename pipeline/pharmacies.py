@@ -250,23 +250,24 @@ def nominatim_lookup(address: str, city: str, zip_code: str) -> tuple[float, flo
     return float(rows[0]["lat"]), float(rows[0]["lon"])
 
 
-def nominatim_refine(df: pd.DataFrame) -> pd.DataFrame:
-    """Backfill weak census/Overture storefront coords with cached OSM lookups."""
+def nominatim_refine(df: pd.DataFrame, cache: dict[str, list[float] | None] | None = None) -> pd.DataFrame:
+    """Prefer OSM storefront pins when Census/Overture landed on the wrong part of the block."""
     out = df.copy()
-    cache = load_geocode_cache()
+    cache = load_geocode_cache() if cache is None else cache
     changed = False
     lats, lons, sources = [], [], []
     for row in out.itertuples(index=False):
         lat, lon, source = float(row.lat), float(row.lon), getattr(row, "loc_source", "census")
-        weak = source != "overture"
-        if weak:
-            coords, added = cached_nominatim(row, cache)
-            changed |= added
-            if coords:
-                candidate = float(coords[0]), float(coords[1])
-                if in_bbox(*candidate) and haversine_m(lat, lon, *candidate) <= 2000:
-                    lat, lon = candidate
-                    source = "nominatim"
+        coords, added = cached_nominatim(row, cache)
+        changed |= added
+        if coords:
+            candidate = (float(coords[0]), float(coords[1]))
+            if in_bbox(*candidate):
+                dist = haversine_m(lat, lon, *candidate)
+                ov_m = getattr(row, "overture_m", None)
+                weak_overture = pd.notna(ov_m) and float(ov_m) > 45
+                if (source != "overture" and dist <= 2000) or dist <= 150 or (weak_overture and dist <= 2000):
+                    lat, lon, source = candidate[0], candidate[1], "nominatim"
         lats.append(lat)
         lons.append(lon)
         sources.append(source)

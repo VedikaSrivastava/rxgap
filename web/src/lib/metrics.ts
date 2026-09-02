@@ -98,6 +98,10 @@ export function closureRank(
   return { rank: index + 1, of: scored.length };
 }
 
+export function servedHouseholds(data: RxGapData, pharmacyId: string): number {
+  return data.hexes.reduce((sum, hex) => (hex.nearestId === pharmacyId ? sum + hex.households : sum), 0);
+}
+
 export function formatHh(n: number): string {
   return Math.round(n).toLocaleString("en-US");
 }

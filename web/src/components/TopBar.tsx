@@ -35,7 +35,7 @@ export function TopBar({
       <div className="brand">
         <strong>RxGap</strong>
         <span>Boston · Cambridge</span>
-        <p>See how a pharmacy closure changes walkable access.</p>
+        <p>Pick a store and see who loses a short walk if it closes.</p>
       </div>
 
       <div className="ask">
@@ -89,7 +89,7 @@ export function TopBar({
           </select>
         </label>
         <label className="mins">
-          Access {threshold} min
+          Too far after {threshold} min
           <input
             type="range"
             min={10}

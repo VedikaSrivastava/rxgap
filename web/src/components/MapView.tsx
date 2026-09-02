@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
-import { cellToBoundary } from "h3-js";
-import { hexAccess } from "../lib/metrics";
-import { minutesColor, minutesOpacity } from "../lib/colors";
-import type { Pace, Pharmacy, RxGapData } from "../lib/types";
+import type { Pharmacy, RxGapData } from "../lib/types";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 const MAX_ZOOM = 16;
-const CLUSTER_MAX_ZOOM = 13;
+const CLUSTER_MAX_ZOOM = 12;
 
 const BASEMAP: maplibregl.StyleSpecification = {
   version: 8,
@@ -41,54 +38,9 @@ type Props = {
   data: RxGapData;
   selectedId: string | null;
   simulating: boolean;
-  pace: Pace;
-  threshold: number;
   altIds: string[];
   onSelect: (id: string) => void;
 };
-
-function hexRing(h3: string): number[][] {
-  const ring = cellToBoundary(h3, true) as number[][];
-  if (!ring.length) return ring;
-  const first = ring[0];
-  const last = ring[ring.length - 1];
-  if (first[0] !== last[0] || first[1] !== last[1]) ring.push([first[0], first[1]]);
-  return ring;
-}
-
-function hexCollection(
-  data: RxGapData,
-  closedId: string | null,
-  mps: number,
-  threshold: number,
-) {
-  return {
-    type: "FeatureCollection" as const,
-    features: data.hexes.map((hex) => {
-      const access = hexAccess(hex, closedId, mps);
-      const base = hexAccess(hex, null, mps);
-      const newlyLost =
-        Boolean(closedId) &&
-        hex.nearestId === closedId &&
-        base.minutes != null &&
-        base.minutes <= threshold &&
-        (access.minutes == null || access.minutes > threshold);
-      return {
-        type: "Feature" as const,
-        properties: {
-          color: minutesColor(access.minutes, threshold, newlyLost, Boolean(closedId)),
-          opacity: minutesOpacity(
-            hex.households,
-            newlyLost,
-            Boolean(closedId),
-            access.minutes == null || access.minutes > threshold,
-          ),
-        },
-        geometry: { type: "Polygon" as const, coordinates: [hexRing(hex.h3)] },
-      };
-    }),
-  };
-}
 
 function pharmacyRole(
   p: Pharmacy,
@@ -137,8 +89,6 @@ export function MapView({
   data,
   selectedId,
   simulating,
-  pace,
-  threshold,
   altIds,
   onSelect,
 }: Props) {
@@ -147,23 +97,16 @@ export function MapView({
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onSelectRef = useRef(onSelect);
 
-  const closedId = simulating ? selectedId : null;
-  const hexes = useMemo(
-    () => hexCollection(data, closedId, pace.mps, threshold),
-    [data, closedId, pace.mps, threshold],
-  );
   const pharmacies = useMemo(
     () => pharmacyCollection(data.pharmacies, selectedId, altIds, simulating),
     [data.pharmacies, selectedId, altIds, simulating],
   );
-  const hexesRef = useRef(hexes);
   const pharmaciesRef = useRef(pharmacies);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
-    hexesRef.current = hexes;
     pharmaciesRef.current = pharmacies;
-  }, [onSelect, hexes, pharmacies]);
+  }, [onSelect, pharmacies]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -191,24 +134,6 @@ export function MapView({
     popupRef.current = popup;
 
     const addLayers = () => {
-      if (!map.getSource("hexes")) {
-        map.addSource("hexes", { type: "geojson", data: hexesRef.current });
-        map.addLayer({
-          id: "hex-fill",
-          type: "fill",
-          source: "hexes",
-          paint: {
-            "fill-color": ["get", "color"],
-            "fill-opacity": ["get", "opacity"],
-          },
-        });
-        map.addLayer({
-          id: "hex-line",
-          type: "line",
-          source: "hexes",
-          paint: { "line-color": "#1b2430", "line-opacity": 0.14, "line-width": 0.5 },
-        });
-      }
       if (!map.getSource("pharmacies")) {
         map.addSource("pharmacies", {
           type: "geojson",
@@ -332,12 +257,6 @@ export function MapView({
       mapRef.current = null;
     };
   }, []);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map?.getSource("hexes")) return;
-    (map.getSource("hexes") as maplibregl.GeoJSONSource).setData(hexes);
-  }, [hexes]);
 
   useEffect(() => {
     const map = mapRef.current;

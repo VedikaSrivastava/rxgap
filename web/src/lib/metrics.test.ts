@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closureRank, impact, weightedMedian } from "./metrics";
+import { closureRank, impact, servedHouseholds, weightedMedian } from "./metrics";
 import type { RxGapData } from "./types";
 
 const pace = { id: "average" as const, label: "Average", mph: 3, mps: 1.34112, source: "test" };
@@ -100,6 +100,13 @@ describe("impact", () => {
       ],
     };
     expect(impact(unroutable, null, pace, 15).alreadyHh).toBe(10);
+  });
+});
+
+describe("servedHouseholds", () => {
+  it("sums households whose nearest pharmacy is this store", () => {
+    expect(servedHouseholds(data, "in")).toBe(100);
+    expect(servedHouseholds(data, "buf")).toBe(0);
   });
 });
 

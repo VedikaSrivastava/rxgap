@@ -4,6 +4,7 @@ from pipeline.pharmacies import (
     clean_address,
     mark_duplicate_licenses,
     match_overture,
+    nominatim_refine,
     overture_address_backfill,
     refine_coordinates,
     storefront_name_match,
@@ -92,6 +93,26 @@ class PharmacyGeo(unittest.TestCase):
         out = mark_duplicate_licenses(rows)
         self.assertEqual(out.loc[0, "duplicate_of"], "new")
         self.assertIsNone(out.loc[1, "duplicate_of"])
+
+    def test_nominatim_overrides_weak_overture_centroid(self):
+        df = pd.DataFrame(
+            [
+                {
+                    "name": "Star Market Pharmacy #3696",
+                    "address": "90 Causeway St",
+                    "city": "Boston",
+                    "zip": "02114",
+                    "lat": 42.3649898,
+                    "lon": -71.0622667,
+                    "loc_source": "overture",
+                    "overture_m": 116.7,
+                }
+            ]
+        )
+        cache = {"90 Causeway St|Boston|02114": [42.3656965, -71.0617268]}
+        out = nominatim_refine(df, cache)
+        self.assertEqual(out.iloc[0].loc_source, "nominatim")
+        self.assertAlmostEqual(out.iloc[0].lat, 42.3656965, places=5)
 
     def test_address_backfill_prefers_pharmacy_category(self):
         rows = pd.DataFrame(

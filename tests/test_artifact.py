@@ -26,6 +26,16 @@ class ArtifactContract(unittest.TestCase):
         self.assertGreater(len(study), 90, "study-area pharmacies should be exported")
         self.assertTrue(any(not p["inStudyArea"] for p in data["pharmacies"]))
         self.assertTrue(any(not p["simulatable"] for p in data["pharmacies"]))
+        known = {
+            "DS90294": (42.3656965, -71.0617268),
+            "DS2636": (42.3620776, -71.0656249),
+            "DS89764": (42.3654203, -71.0608938),
+        }
+        by_id = {p["id"]: p for p in data["pharmacies"]}
+        for license_id, (lat, lon) in known.items():
+            p = by_id[license_id]
+            meters = ((p["lat"] - lat) ** 2 + (p["lon"] - lon) ** 2) ** 0.5 * 111_000
+            self.assertLess(meters, 50, f"{license_id} plotted {meters:.0f} m from storefront")
 
     def test_generated_demand_conserves_households(self):
         path = WEB_DATA / "rxgap.json"

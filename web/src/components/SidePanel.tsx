@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { closureRank, formatHh, formatMin, formatWalk, impact } from "../lib/metrics";
+import { closureRank, formatHh, formatMin, formatWalk, impact, servedHouseholds } from "../lib/metrics";
 import type { Pace, Pharmacy, RxGapData } from "../lib/types";
 
 type Props = {
@@ -23,6 +23,7 @@ export function SidePanel({
   onClear,
   onDeselect,
 }: Props) {
+  const served = useMemo(() => servedHouseholds(data, selected.id), [data, selected]);
   const stats = useMemo(
     () => impact(data, selected.id, pace, threshold),
     [data, selected, pace, threshold],
@@ -43,33 +44,45 @@ export function SidePanel({
 
       {!simulating ? (
         selected.simulatable ? (
-          <button className="cta" onClick={onSimulate}>
-            Simulate closure
-          </button>
+          <>
+            <div className="stat">
+              <span>Closest store for</span>
+              <b>{formatHh(served)}</b>
+              <p>no-vehicle households in Boston and Cambridge</p>
+            </div>
+            <p className="lead">
+              If it closes, those households walk to the next licensed pharmacy. A walk
+              over {threshold} minutes counts as losing access.
+            </p>
+            <button className="cta" onClick={onSimulate}>
+              Simulate closure
+            </button>
+          </>
         ) : (
           <p className="warn">{selected.excludeReason ?? "This pharmacy cannot be simulated."}</p>
         )
       ) : (
         <>
           <div className="stat is-after">
-            <span>Households newly beyond {threshold} min</span>
+            <span>Would lose a {threshold}-min walk</span>
             <b>+{formatHh(stats.newlyHh)}</b>
+            <p>no-vehicle households whose closest store is this one, and whose next option is too far</p>
           </div>
           <div className="stat">
-            <span>Median extra walk</span>
+            <span>Typical extra walk</span>
             <b>{formatMin(stats.medianExtraMin)}</b>
-            <p>households whose nearest pharmacy was this location</p>
+            <p>for households that used this as their closest pharmacy</p>
           </div>
           {rank && (
             <div className="stat">
-              <span>Highest-impact closure</span>
+              <span>Impact rank</span>
               <b>#{rank.rank}</b>
-              <p>of {rank.of} study-area pharmacies</p>
+              <p>of {rank.of} Boston and Cambridge pharmacies we can close in the tool</p>
             </div>
           )}
           {stats.alternatives[0]?.pharmacy && (
             <div className="alts">
-              <p>Nearest alternatives after closure</p>
+              <p>Where they go next</p>
               <ul>
                 {stats.alternatives.map((alt) =>
                   alt.pharmacy ? (

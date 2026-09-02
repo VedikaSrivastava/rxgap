@@ -57,8 +57,6 @@ export default function App() {
           data={data}
           selectedId={selectedId}
           simulating={simulating}
-          pace={pace}
-          threshold={threshold}
           altIds={altIds}
           onSelect={(id) => {
             setSelectedId(id);
@@ -81,26 +79,30 @@ export default function App() {
           />
         )}
         {!selected && (
-          <p className="hint">Click a pharmacy to see what happens if it disappears.</p>
+          <p className="hint">Pick a pharmacy on the map, then simulate what happens if it closes.</p>
         )}
         <div className="legend">
           <span>
             <i className="swatch ink" /> pharmacy
           </span>
+          {simulating && (
+            <>
+              <span>
+                <i className="swatch coral" /> closing
+              </span>
+              <span>
+                <i className="swatch teal" /> next closest
+              </span>
+            </>
+          )}
           <span>
-            <i className="swatch gray" /> not simulatable
-          </span>
-          <span>
-            <i className="swatch teal" /> within {threshold} min
-          </span>
-          <span>
-            <i className="swatch coral" /> {simulating ? "newly lost" : "already far"}
+            <i className="swatch gray" /> can&apos;t simulate
           </span>
           <p>
-            {data.pharmacies.length} licensed pharmacies in view. Zoom in to split
-            clusters into individual stores. Across Boston + Cambridge today, ~
-            {formatHh(stats.alreadyHh)} no-vehicle households are already beyond a{" "}
-            {threshold}-minute walk.
+            Numbered circles are groups of stores — zoom in to see each one. A walk
+            over {threshold} min (at {pace.label.toLowerCase()} pace) counts as too far.
+            Today, about {formatHh(stats.alreadyHh)} no-vehicle households in Boston and
+            Cambridge are already past that.
           </p>
         </div>
       </div>
