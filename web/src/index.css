@@ -23,10 +23,10 @@ html, body, #root { height: 100%; margin: 0; }
 .topbar {
   z-index: 3;
   display: grid;
-  grid-template-columns: auto minmax(240px, 1fr) auto;
-  gap: 20px;
+  grid-template-columns: minmax(180px, 240px) minmax(220px, 1fr) auto;
+  gap: 16px;
   align-items: center;
-  padding: 10px 16px;
+  padding: 8px 16px;
   background: var(--card);
   border-bottom: 1px solid var(--line);
 }
@@ -34,15 +34,22 @@ html, body, #root { height: 100%; margin: 0; }
 .brand {
   display: flex;
   flex-direction: column;
-  line-height: 1.1;
+  line-height: 1.15;
 }
 .brand strong {
   font-family: Fraunces, serif;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 500;
   letter-spacing: -0.03em;
 }
 .brand span { font-size: 11px; color: var(--muted); letter-spacing: 0.06em; }
+.brand p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0;
+  max-width: 220px;
+}
 
 .ask { position: relative; }
 .ask label {
@@ -51,15 +58,15 @@ html, body, #root { height: 100%; margin: 0; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .ask input {
   width: 100%;
   border: 1px solid var(--line);
   background: #fff;
-  padding: 9px 12px;
+  padding: 6px 10px;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   color: inherit;
 }
 
@@ -91,25 +98,18 @@ html, body, #root { height: 100%; margin: 0; }
 .suggest b { display: block; font-size: 14px; }
 .suggest span { display: block; font-size: 12px; color: var(--muted); }
 
-.toggles { display: flex; gap: 14px; align-items: center; }
-.seg {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+.toggles { display: flex; gap: 12px; align-items: center; }
+.pace, .mins { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); }
+.pace select {
+  margin-top: 2px;
   border: 1px solid var(--line);
-}
-.seg button {
-  border: 0;
   background: #fff;
-  padding: 7px 10px;
+  padding: 5px 8px;
   font: inherit;
   font-size: 13px;
-  color: var(--muted);
-  cursor: pointer;
+  color: var(--ink);
 }
-.seg button.is-on { background: var(--ink); color: var(--paper); }
-
-.mins { display: flex; flex-direction: column; min-width: 110px; }
-.mins span { font-size: 11px; color: var(--muted); }
+.mins { min-width: 120px; }
 .mins input { accent-color: var(--ink); }
 
 .stage {
@@ -130,10 +130,10 @@ html, body, #root { height: 100%; margin: 0; }
   top: 16px;
   right: 16px;
   z-index: 2;
-  width: min(320px, calc(100% - 32px));
+  width: min(280px, calc(100% - 32px));
   max-height: calc(100% - 32px);
   overflow: auto;
-  padding: 18px 16px 16px;
+  padding: 14px 14px 12px;
   background: var(--card);
   border: 1px solid var(--line);
   box-shadow: 0 16px 40px rgba(27, 36, 48, 0.14);
@@ -160,7 +160,7 @@ html, body, #root { height: 100%; margin: 0; }
   cursor: pointer;
 }
 
-.stat { margin-bottom: 14px; }
+.stat { margin-bottom: 10px; }
 .stat span {
   display: block;
   font-size: 11px;
@@ -171,12 +171,27 @@ html, body, #root { height: 100%; margin: 0; }
 .stat b {
   display: block;
   font-family: Fraunces, serif;
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 500;
   letter-spacing: -0.03em;
 }
-.stat p { margin: 2px 0 0; font-size: 13px; color: var(--muted); line-height: 1.35; }
+.stat p { margin: 2px 0 0; font-size: 12px; color: var(--muted); line-height: 1.35; }
 .stat.is-after b { color: var(--coral); }
+
+.alts-toggle {
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  cursor: pointer;
+}
 
 .rank { font-size: 13px; color: var(--muted); line-height: 1.4; margin: 0 0 14px; }
 .rank strong { color: var(--ink); }
@@ -201,6 +216,15 @@ html, body, #root { height: 100%; margin: 0; }
   cursor: pointer;
 }
 .cta { background: var(--coral); color: #fffaf6; }
+.warn {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f4f0ea;
+  color: #5a4a3a;
+  font-size: 13px;
+  line-height: 1.4;
+}
 .ghost { margin-top: 4px; background: transparent; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 
 .hint {
@@ -224,11 +248,18 @@ html, body, #root { height: 100%; margin: 0; }
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  max-width: min(420px, calc(100% - 320px));
   background: var(--card);
   border: 1px solid var(--line);
   padding: 7px 10px;
   font-size: 12px;
   color: var(--muted);
+}
+.legend p {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .swatch {
@@ -240,6 +271,7 @@ html, body, #root { height: 100%; margin: 0; }
   vertical-align: middle;
 }
 .swatch.ink { background: var(--ink); }
+.swatch.gray { background: #9aa3ad; }
 .swatch.teal { background: var(--teal); }
 .swatch.coral { background: var(--coral); }
 
@@ -269,6 +301,20 @@ html, body, #root { height: 100%; margin: 0; }
   height: 14px;
   background: var(--teal);
 }
+.pharm-dot.is-buffer {
+  width: 10px;
+  height: 10px;
+  background: #8a9199;
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pharm-dot.is-excluded {
+  background: #9aa3ad;
+  border-color: #fff;
+  opacity: 0.72;
+  cursor: pointer;
+}
 
 .boot {
   height: 100%;
@@ -279,6 +325,22 @@ html, body, #root { height: 100%; margin: 0; }
 }
 
 .maplibregl-ctrl-attrib { font-size: 10px; }
+
+.pharm-pop .maplibregl-popup-content {
+  padding: 8px 10px;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(27, 36, 48, 0.18);
+  font-size: 12px;
+  line-height: 1.35;
+  max-width: 220px;
+}
+.pharm-pop b {
+  display: block;
+  margin-bottom: 2px;
+}
+.pharm-pop span {
+  color: #5c6570;
+}
 
 @media (max-width: 860px) {
   .topbar { grid-template-columns: 1fr; gap: 10px; }

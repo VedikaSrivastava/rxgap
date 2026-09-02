@@ -1,10 +1,11 @@
 {
-  "nodes": 835820,
-  "undirected_edges": 940768,
+  "nodes": 225013,
+  "undirected_edges": 326118,
   "segments_used": 150534,
-  "components": 595,
-  "largest_component_nodes": 821118,
-  "largest_component_share": 0.9824,
+  "topology": "overture_connector_id",
+  "components": 599,
+  "largest_component_nodes": 222007,
+  "largest_component_share": 0.9866,
   "bridge_name_hits": {
     "Harvard": [
       "Harvard Avenue",
@@ -30,27 +31,27 @@
   },
   "snap_meters": {
     "boston_city_hall": 31.0,
-    "harvard_square": 7.9,
+    "harvard_square": 10.1,
     "kendall": 6.0,
     "nubian": 2.6,
-    "longfellow_boston": 22.8,
-    "longfellow_cambridge": 137.3,
-    "harvard_bridge_boston": 147.5,
-    "harvard_bridge_cambridge": 22.9,
-    "bu_boston": 3.0,
+    "longfellow_boston": 43.7,
+    "longfellow_cambridge": 203.3,
+    "harvard_bridge_boston": 152.9,
+    "harvard_bridge_cambridge": 46.5,
+    "bu_boston": 4.9,
     "bu_cambridge": 5.9,
     "brookline_border": 1.4,
     "somerville_border": 33.0,
-    "newton_border": 9.6
+    "newton_border": 25.6
   },
   "routes_m": {
-    "boston_to_harvard_square_m": 5565.9,
-    "longfellow_cross_m": 677.6,
-    "harvard_bridge_cross_m": 1218.3,
-    "bu_bridge_cross_m": 874.1,
-    "boston_to_brookline_border_m": 5762.8,
-    "cambridge_to_somerville_border_m": 2652.3,
-    "boston_to_newton_border_m": 8293.2
+    "boston_to_harvard_square_m": 5562.9,
+    "longfellow_cross_m": 1326.1,
+    "harvard_bridge_cross_m": 1243.4,
+    "bu_bridge_cross_m": 873.2,
+    "boston_to_brookline_border_m": 5762.6,
+    "cambridge_to_somerville_border_m": 2648.0,
+    "boston_to_newton_border_m": 8318.0
   },
   "pass": {
     "largest_component_dominant": true,

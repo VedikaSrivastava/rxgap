@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { MapView } from "./components/MapView";
 import { SidePanel } from "./components/SidePanel";
 import { TopBar } from "./components/TopBar";
-import { impact } from "./lib/metrics";
+import { formatHh, impact } from "./lib/metrics";
 import type { PaceId, RxGapData } from "./lib/types";
 
 export default function App() {
@@ -32,11 +32,10 @@ export default function App() {
 
   const selected = data.pharmacies.find((p) => p.id === selectedId) ?? null;
   const pace = data.meta.paces[paceId];
+  const stats = impact(data, simulating ? selected?.id ?? null : null, pace, threshold);
   const altIds =
     selected && simulating
-      ? impact(data, selected.id, pace, threshold)
-          .alternatives.map((a) => a.pharmacy?.id)
-          .filter((id): id is string => Boolean(id))
+      ? stats.alternatives.map((a) => a.pharmacy?.id).filter((id): id is string => Boolean(id))
       : [];
 
   return (
@@ -89,11 +88,20 @@ export default function App() {
             <i className="swatch ink" /> pharmacy
           </span>
           <span>
+            <i className="swatch gray" /> not simulatable
+          </span>
+          <span>
             <i className="swatch teal" /> within {threshold} min
           </span>
           <span>
             <i className="swatch coral" /> {simulating ? "newly lost" : "already far"}
           </span>
+          <p>
+            {data.pharmacies.length} licensed pharmacies in view. Zoom in to split
+            clusters into individual stores. Across Boston + Cambridge today, ~
+            {formatHh(stats.alreadyHh)} no-vehicle households are already beyond a{" "}
+            {threshold}-minute walk.
+          </p>
         </div>
       </div>
     </div>

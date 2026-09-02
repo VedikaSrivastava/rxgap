@@ -75,16 +75,23 @@ def load_cities(con) -> dict:
 def load_acs() -> pd.DataFrame:
     dest = DATA_RAW / "acsdt5y2023-b25044.dat"
     _download(ACS_B25044, dest)
-    df = pd.read_csv(dest, sep="|", dtype=str, usecols=["GEO_ID", "B25044_E001", "B25044_E003", "B25044_E010"])
+    df = pd.read_csv(
+        dest,
+        sep="|",
+        dtype=str,
+        usecols=["GEO_ID", "B25044_E001", "B25044_M001", "B25044_E003", "B25044_M003", "B25044_E010", "B25044_M010"],
+    )
     df = df[df["GEO_ID"].str.startswith("1500000US25", na=False)].copy()
     df["geoid"] = df["GEO_ID"].str.replace("1500000US", "", regex=False)
     df["households"] = pd.to_numeric(df["B25044_E001"], errors="coerce").fillna(0)
-    df["no_vehicle"] = (
-        pd.to_numeric(df["B25044_E003"], errors="coerce").fillna(0)
-        + pd.to_numeric(df["B25044_E010"], errors="coerce").fillna(0)
-    )
+    owner = pd.to_numeric(df["B25044_E003"], errors="coerce").fillna(0)
+    renter = pd.to_numeric(df["B25044_E010"], errors="coerce").fillna(0)
+    owner_moe = pd.to_numeric(df["B25044_M003"], errors="coerce").fillna(0)
+    renter_moe = pd.to_numeric(df["B25044_M010"], errors="coerce").fillna(0)
+    df["no_vehicle"] = owner + renter
+    df["no_vehicle_moe"] = np.sqrt(owner_moe**2 + renter_moe**2)
     print(f"ACS block groups in MA: {len(df)}", flush=True)
-    return df[["geoid", "households", "no_vehicle"]]
+    return df[["geoid", "households", "no_vehicle", "no_vehicle_moe"]]
 
 
 def load_block_groups(con, cities: dict) -> pd.DataFrame:
@@ -117,7 +124,17 @@ def load_block_groups(con, cities: dict) -> pd.DataFrame:
             city = "Boston"
         if city is None:
             continue
-        keep.append({"geoid": rec.geoid, "city": city, "wkt": rec.wkt, "area": geom.area})
+        point = inter.representative_point()
+        keep.append(
+            {
+                "geoid": rec.geoid,
+                "city": city,
+                "wkt": inter.wkt,
+                "area": inter.area,
+                "lat": point.y,
+                "lon": point.x,
+            }
+        )
     return pd.DataFrame(keep)
 
 
@@ -146,9 +163,36 @@ def is_residential(row: pd.Series) -> bool:
         tokens = f"{subtype} {klass}"
     if subtype == "residential" or any(t in tokens for t in ("apartment", "house", "dwell", "residential", "dorm")):
         return True
-    if any(t in tokens for t in ("industrial", "commercial", "retail", "warehouse", "parking", "garage", "utility", "hospital", "school")):
-        return False
-    return True
+    return False
+
+
+def allocate_households(mapped: pd.DataFrame, bgs: pd.DataFrame) -> pd.DataFrame:
+    """Prefer residential buildings per block group and preserve every ACS household."""
+    if mapped.empty:
+        selected = mapped.copy()
+    else:
+        has_residential = mapped.groupby("geoid")["residential"].transform("any")
+        selected = mapped[mapped["residential"] | ~has_residential].copy()
+
+    missing = bgs[~bgs["geoid"].isin(selected.get("geoid", []))]
+    if len(missing):
+        fallback = missing[["geoid", "city", "lat", "lon"]].copy()
+        fallback["id"] = "block-group:" + fallback["geoid"].astype(str)
+        fallback["weight"] = 1.0
+        fallback["residential"] = False
+        selected = pd.concat([selected, fallback[selected.columns]], ignore_index=True)
+
+    weights = selected.groupby("geoid")["weight"].sum().rename("bg_weight")
+    selected = selected.merge(weights, on="geoid").merge(
+        bgs[["geoid", "no_vehicle"]], on="geoid", how="left", validate="many_to_one"
+    )
+    selected["hh"] = selected["no_vehicle"] * selected["weight"] / selected["bg_weight"]
+
+    expected = float(bgs["no_vehicle"].sum())
+    allocated = float(selected["hh"].sum())
+    if not np.isclose(allocated, expected, rtol=0, atol=0.01):
+        raise RuntimeError(f"Demand allocation lost households: {allocated:.3f} of {expected:.3f}")
+    return selected
 
 
 def run() -> pd.DataFrame:
@@ -159,41 +203,34 @@ def run() -> pd.DataFrame:
     acs = load_acs()
     bgs = load_block_groups(con, cities).merge(acs, on="geoid", how="left")
     bgs["no_vehicle"] = bgs["no_vehicle"].fillna(0)
+    bgs["no_vehicle_moe"] = bgs["no_vehicle_moe"].fillna(0)
     bgs["households"] = bgs["households"].fillna(0)
 
     buildings = load_buildings(con, union.wkt)
     buildings["residential"] = buildings.apply(is_residential, axis=1)
-    res = buildings[buildings["residential"]].copy()
-    if len(res) < 500:
-        res = buildings.copy()
-        res["residential"] = True
-
-    floors = pd.to_numeric(res["num_floors"], errors="coerce").to_numpy(dtype="float64")
-    height = pd.to_numeric(res["height"], errors="coerce").to_numpy(dtype="float64")
-    area = pd.to_numeric(res["area_m2"], errors="coerce").to_numpy(dtype="float64")
+    floors = pd.to_numeric(buildings["num_floors"], errors="coerce").to_numpy(dtype="float64")
+    height = pd.to_numeric(buildings["height"], errors="coerce").to_numpy(dtype="float64")
+    area = pd.to_numeric(buildings["area_m2"], errors="coerce").to_numpy(dtype="float64")
     floors = np.where(np.isnan(floors), np.where(np.isnan(height), 1.0, np.maximum(height / 3.1, 1.0)), floors)
     floors = np.clip(floors, 1.0, None)
     area = np.where(np.isnan(area) | (area <= 0), 80.0, area)
-    res = res.copy()
-    res["weight"] = area * floors
+    buildings["weight"] = area * floors
 
-    con.register("res_pts", res[["id", "lat", "lon", "weight"]])
+    con.register("building_pts", buildings[["id", "lat", "lon", "weight", "residential"]])
     con.execute("CREATE OR REPLACE TABLE bgs_geom (geoid VARCHAR, city VARCHAR, geom GEOMETRY)")
     for rec in bgs.itertuples(index=False):
         con.execute(
             "INSERT INTO bgs_geom VALUES (?, ?, ST_GeomFromText(?))",
             [rec.geoid, rec.city, rec.wkt],
         )
-    res = con.execute(
+    mapped = con.execute(
         """
-        SELECT r.id, r.lat, r.lon, r.weight, g.geoid, g.city
-        FROM res_pts r
-        JOIN bgs_geom g ON ST_Contains(g.geom, ST_Point(r.lon, r.lat))
+        SELECT b.id, b.lat, b.lon, b.weight, b.residential, g.geoid, g.city
+        FROM building_pts b
+        JOIN bgs_geom g ON ST_Contains(g.geom, ST_Point(b.lon, b.lat))
         """
     ).df()
-    bg_weight = res.groupby("geoid")["weight"].sum().rename("bg_weight")
-    res = res.merge(bg_weight, on="geoid").merge(bgs[["geoid", "no_vehicle"]], on="geoid", how="left")
-    res["hh"] = np.where(res["bg_weight"] > 0, res["no_vehicle"] * res["weight"] / res["bg_weight"], 0)
+    res = allocate_households(mapped, bgs)
 
     res["h3"] = [h3.latlng_to_cell(lat, lon, H3_RESOLUTION) for lat, lon in zip(res["lat"], res["lon"])]
     hexes = (
@@ -209,7 +246,10 @@ def run() -> pd.DataFrame:
         "num_floors_nonnull": round(float(pd.to_numeric(buildings["num_floors"], errors="coerce").notna().mean()), 3) if len(buildings) else 0,
         "height_nonnull": round(float(pd.to_numeric(buildings["height"], errors="coerce").notna().mean()), 3) if len(buildings) else 0,
         "block_groups": int(len(bgs)),
-        "no_vehicle_households": round(float(bgs["no_vehicle"].sum()), 1),
+        "no_vehicle_households": round(float(res["hh"].sum()), 1),
+        "no_vehicle_moe": round(float(np.sqrt((bgs["no_vehicle_moe"] ** 2).sum())), 1),
+        "fallback_block_groups": int(res["id"].astype(str).str.startswith("block-group:").sum()),
+        "mass_conserved": True,
         "hexes": int(len(hexes)),
         "dasymetric_ok": bool(pd.to_numeric(buildings["num_floors"], errors="coerce").notna().mean() > 0.2 or pd.to_numeric(buildings["height"], errors="coerce").notna().mean() > 0.4),
     }

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { closureRank, formatHh, formatMin, impact } from "../lib/metrics";
+import { closureRank, formatHh, formatMin, formatWalk, impact } from "../lib/metrics";
 import type { Pace, Pharmacy, RxGapData } from "../lib/types";
 
 type Props = {
@@ -37,47 +37,45 @@ export function SidePanel({
       <button className="close" onClick={onDeselect} aria-label="Clear selection">
         ×
       </button>
-      <p className="kicker">{simulating ? "After this closes" : "This location"}</p>
+      <p className="kicker">{simulating ? "If this closes" : "This location"}</p>
       <h2>{selected.name}</h2>
       <p className="addr">{selected.address}</p>
 
-      <div className="stat">
-        <span>Already beyond {threshold} min</span>
-        <b>~{formatHh(stats.alreadyHh)}</b>
-        <p>no-vehicle households, before any closure</p>
-      </div>
-
       {!simulating ? (
-        <button className="cta" onClick={onSimulate}>
-          Simulate closure
-        </button>
+        selected.simulatable ? (
+          <button className="cta" onClick={onSimulate}>
+            Simulate closure
+          </button>
+        ) : (
+          <p className="warn">{selected.excludeReason ?? "This pharmacy cannot be simulated."}</p>
+        )
       ) : (
         <>
           <div className="stat is-after">
-            <span>Newly beyond {threshold} min</span>
+            <span>Households newly beyond {threshold} min</span>
             <b>+{formatHh(stats.newlyHh)}</b>
-            <p>additional no-vehicle households lose access</p>
           </div>
           <div className="stat">
-            <span>Extra walk for people who used this store</span>
+            <span>Median extra walk</span>
             <b>{formatMin(stats.medianExtraMin)}</b>
-            <p>median additional walking time</p>
+            <p>households whose nearest pharmacy was this location</p>
           </div>
           {rank && (
-            <p className="rank">
-              This would be the <strong>#{rank.rank}</strong> most disruptive
-              closure of {rank.of} pharmacies here.
-            </p>
+            <div className="stat">
+              <span>Highest-impact closure</span>
+              <b>#{rank.rank}</b>
+              <p>of {rank.of} study-area pharmacies</p>
+            </div>
           )}
           {stats.alternatives[0]?.pharmacy && (
             <div className="alts">
-              <p>Where people go next</p>
+              <p>Nearest alternatives after closure</p>
               <ul>
                 {stats.alternatives.map((alt) =>
                   alt.pharmacy ? (
                     <li key={alt.pharmacy.id}>
                       <b>{alt.pharmacy.name}</b>
-                      <span>{alt.pharmacy.city}</span>
+                      <span>{formatWalk(alt.minutes)}</span>
                     </li>
                   ) : null,
                 )}

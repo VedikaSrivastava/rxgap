@@ -10,6 +10,7 @@ web/.vite/
 
 data/raw/
 data/scratch/
+data/reports/spike.json
 *.zip
 *.parquet
 *.npz

@@ -1,7 +1,9 @@
 {
-  "hexes": 653,
-  "pharmacies": 220,
-  "reachable_hex_share": 0.992,
-  "median_nearest_m": 606.5,
-  "p90_nearest_m": 1242.4
+  "hexes_total": 1101,
+  "hexes_routable": 1100,
+  "pharmacies_routable": 214,
+  "pharmacies_total": 223,
+  "reachable_hex_share": 0.999,
+  "median_nearest_m": 771.8,
+  "p90_nearest_m": 1598.5
 }

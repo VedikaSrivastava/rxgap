@@ -28,7 +28,7 @@ def main() -> None:
         except Exception as exc:
             traceback.print_exc()
             steps.append({"name": name, "ok": False, "error": str(exc)})
-            if name in {"overture", "graph"}:
+            if name != "cms":
                 raise
 
     if not args.skip_cms:
