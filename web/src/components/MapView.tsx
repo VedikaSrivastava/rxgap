@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as maplibregl from "maplibre-gl";
+import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { cellToBoundary } from "h3-js";
 import { hexFill } from "../lib/colors";
 import { hexAccess, isNewlyLost } from "../lib/metrics";
 import type { Pace, Pharmacy, RxGapData } from "../lib/types";
 import "maplibre-gl/dist/maplibre-gl.css";
+
+maplibregl.setWorkerUrl(workerUrl);
 
 const MAX_ZOOM = 16;
 const CLUSTER_MAX_ZOOM = 12;

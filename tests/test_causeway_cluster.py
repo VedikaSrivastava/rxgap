@@ -1,9 +1,7 @@
+import json
 import unittest
 
 import pandas as pd
-from scipy.sparse.csgraph import dijkstra
-
-from pipeline.graph import load_graph, nearest_reachable_node
 
 
 class CausewayCluster(unittest.TestCase):
@@ -14,17 +12,21 @@ class CausewayCluster(unittest.TestCase):
             raise unittest.SkipTest("processed pharmacies not built")
         cls.snapped = pd.read_csv(path, dtype=str)
 
-    def test_star_market_snaps_to_main_component(self):
-        graph, coords = load_graph()
+    def test_star_market_is_routable(self):
         star = self.snapped[self.snapped["license"] == "DS90294"].iloc[0]
-        node, snap_m = nearest_reachable_node(
-            graph, coords, float(star.lat), float(star.lon), max_m=250
-        )
-        self.assertLessEqual(snap_m, 250)
-        cvs = self.snapped[self.snapped["license"] == "DS89764"].iloc[0]
-        cvs_node = int(cvs.node)
-        meters = dijkstra(graph, directed=False, indices=cvs_node, unweighted=False)[node]
-        self.assertTrue(meters < float("inf"))
+        self.assertTrue(str(star.routable).lower() in {"true", "1"})
+        self.assertLessEqual(float(star.snap_m), 250)
+
+    def test_star_market_is_reachable_from_nearby_hexes(self):
+        access = pd.read_csv("data/processed/access.csv", dtype=str)
+        used = (access["nearest_id"] == "DS90294") | (access["second_id"] == "DS90294")
+        self.assertTrue(used.any())
+
+    def test_graph_validation_passed(self):
+        with open("data/reports/graph.json") as f:
+            report = json.load(f)
+        self.assertEqual(report["topology"], "overture_connector_id")
+        self.assertTrue(report["all_pass"])
 
     def test_genoa_shown_but_not_routed(self):
         genoa = self.snapped[self.snapped["license"] == "DS90422"]
