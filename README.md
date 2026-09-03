@@ -6,11 +6,9 @@ Pick a licensed walk-in pharmacy, simulate it closing, and see which no-vehicle 
 
 ## What it shows
 
-The map plots currently licensed retail pharmacies. Select one and click **Simulate closure**. Coverage then shifts from today’s nearest store to the next one, using a 15-minute walk as the default “too far” threshold.
+The map shades H3 demand cells by whether a licensed storefront is within a 15-minute walk. Select a pharmacy and click **Simulate closure**. Coverage then shifts from today’s walkable cells to the households that lose that walk — newly lost cells turn coral. Changing walk pace or the minute threshold recolors the map.
 
-Headline impact is household-weighted: how many no-vehicle households lose a walk under the threshold, and the typical extra walk for households that used that store as their closest option. That is a modeled nearest-store result, not a claim about where people actually shop.
-
-Walk pace (slow / average / brisk) and the minute threshold can be changed in the app.
+Headline impact is household-weighted: how many no-vehicle households lose a walk under the threshold, and the typical extra walk for households whose modeled nearest pharmacy is that location. That is a nearest-store result, not a claim about where people actually shop.
 
 ## Who it's for
 
@@ -34,11 +32,11 @@ The walk graph uses that same window so routes are not cut at a municipal line.
 
 ## How it works
 
-**Pharmacies.** Operating status comes from the Massachusetts Board of Registration in Pharmacy currently licensed *Retail Pharmacy* roster. NPPES taxonomy `3336C0003X` is type evidence (community/retail), not proof the store is open. Mail-order, long-term care, and other non-walk-in licenses can still appear on the map with a reason; only walk-in storefronts that snap to the network can be closed in the tool.
+**Pharmacies.** Operating status comes from the Massachusetts Board of Registration in Pharmacy currently licensed *Retail Pharmacy* roster. NPPES taxonomy `3336C0003X` is type evidence (community/retail), not proof the store is open. Mail-order, long-term care, and other non-walk-in licenses can still appear on the map with a reason; only walk-in storefronts that snap to the network can be closed in the tool. Pins are geocoded Census batch → NPPES coordinates → Overture storefront match → OSM Nominatim. Nominatim refined 53 locations in the current build.
 
-**Demand.** ACS 2023 5-year table B25044 (no-vehicle households, with margins of error) is allocated onto Overture buildings inside each block group, preferring residential buildings, then aggregated to [H3](https://h3geo.org/) resolution 9. The ACS block-group total is conserved.
+**Demand.** ACS 2023 5-year table B25044 (no-vehicle households, with margins of error) is allocated onto Overture buildings inside each block group, preferring residential buildings, then aggregated to [H3](https://h3geo.org/) resolution 9. The ACS block-group total is conserved. Block groups that only partly overlap the study window keep the inside share when that clipped-away mass is material (about 1.5% here); see `data/reports/buildings_demand.json`.
 
-**Walking.** Routes use Overture transportation segments joined on `connector_id`. Shape coordinates measure length; they do not decide whether two segments connect. Distance is origin snap + graph path + destination snap.
+**Walking.** Routes use Overture transportation segments joined on `connector_id`. Shape coordinates measure length; they do not decide whether two segments connect. Distance is origin snap + graph path + destination snap. Limited-access trunks are omitted unless the name is a bridge or overpass (Longfellow and the BU Bridge are tagged trunk). Modeled walks are checked against geodesic length and OSRM’s public foot profile in `data/reports/validation.json`.
 
 | Pace | Speed | Source |
 | --- | --- | --- |
@@ -52,6 +50,7 @@ The walk graph uses that same window so routes are not cut at a municipal line.
 | --- | --- |
 | Currently licensed location | MA Board of Registration in Pharmacy, retail roster |
 | Pharmacy type | NPPES taxonomy `3336C0003X` |
+| Storefront pin fallback | Census batch geocoder, then NPPES, Overture places, OSM Nominatim |
 | Buildings, places, walk network | [Overture Maps](https://overturemaps.org/) (release pinned in `pipeline/config.py`) |
 | Households without a vehicle | ACS 2023 5-year B25044 |
 | Municipal boundaries | Census TIGER/Line county subdivisions |
@@ -72,10 +71,14 @@ pip install -r requirements.txt
 cd web
 npm install
 npm test
+npm run lint
+npm run build
 npm run dev
 ```
 
 The UI is a Vite + React + MapLibre app. It reads `web/public/data/rxgap.json`.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the Python tests, Vitest, oxlint, and the production build on every push.
 
 ### Rebuild the data
 
@@ -86,13 +89,17 @@ python -m pipeline.build --skip-cms
 python -m unittest discover -s tests
 ```
 
-That extracts Overture layers for the analysis window, geocodes licensed pharmacies, builds the walk graph, allocates demand, computes nearest and second-nearest stores, and writes `web/public/data/rxgap.json`.
+That extracts Overture layers for the analysis window, geocodes licensed pharmacies, builds the walk graph, checks a handful of walks against OSRM, allocates demand, computes nearest and second-nearest stores, and writes `web/public/data/rxgap.json`.
 
 `--skip-cms` skips an optional CMS cross-check that is not required for the map.
 
 ## Deploy
 
-[Vercel](https://vercel.com) can host the frontend. Root `vercel.json` builds `web/` and publishes `web/dist`. Commit `web/public/data/rxgap.json` so production does not need the Python pipeline.
+[Vercel](https://vercel.com) can host the frontend. Root `vercel.json` builds `web/` and publishes `web/dist`. Commit `web/public/data/rxgap.json` so production does not need the Python pipeline. Once it is live, add `Live demo: <url>` at the top of this README and set the same URL as the GitHub repository homepage.
+
+## Cuts
+
+No transit, driving, delivery/mail-order, insurance networks, medication availability, hours, or opening-location optimization. The question is walkable access to a licensed storefront if one location closes.
 
 ## Limitations
 
@@ -102,4 +109,4 @@ That extracts Overture layers for the analysis window, geocodes licensed pharmac
 - ACS margins of error are kept at block-group and citywide level. They are not spread onto H3 cells.
 - Households at the outer edge of the extract window may have a nearer pharmacy just outside it.
 
-The pipeline refuses to finish if a known-closed storefront is marked active, if demand allocation drops households, or if the pedestrian graph fails continuity checks (including Boston–Cambridge crossings of the Charles). Those reports live in `data/reports/`.
+The pipeline refuses to finish if a known-closed storefront is marked active, if demand allocation drops households, or if the pedestrian graph fails continuity checks (including Boston–Cambridge crossings of the Charles). Walking-distance checks live in `data/reports/validation.json`.

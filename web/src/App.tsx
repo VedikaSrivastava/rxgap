@@ -57,6 +57,8 @@ export default function App() {
           data={data}
           selectedId={selectedId}
           simulating={simulating}
+          pace={pace}
+          threshold={threshold}
           altIds={altIds}
           onSelect={(id) => {
             setSelectedId(id);
@@ -82,6 +84,17 @@ export default function App() {
           <p className="hint">Pick a pharmacy on the map, then simulate what happens if it closes.</p>
         )}
         <div className="legend">
+          <span>
+            <i className="swatch cell walk" /> walkable
+          </span>
+          <span>
+            <i className="swatch cell beyond" /> already too far
+          </span>
+          {simulating && (
+            <span>
+              <i className="swatch cell coral" /> newly lost
+            </span>
+          )}
           <span>
             <i className="swatch ink" /> pharmacy
           </span>

@@ -276,7 +276,9 @@ html, body, #root { height: 100%; margin: 0; }
   margin-right: 5px;
   vertical-align: middle;
 }
-.swatch.ink { background: var(--ink); }
+.swatch.walk { background: #3d8f86; }
+.swatch.beyond { background: #d4a090; }
+.swatch.cell { border-radius: 2px; width: 10px; height: 10px; }
 .swatch.gray { background: #9aa3ad; }
 .swatch.teal { background: var(--teal); }
 .swatch.coral { background: var(--coral); }

@@ -85,7 +85,7 @@ def run() -> None:
     pharmacies["in_study_area"] = pharmacies.apply(lambda r: in_study_area(r, union), axis=1)
 
     reports = {}
-    for name in ("pharmacies", "graph", "buildings_demand", "access", "cms_check", "overture_extract"):
+    for name in ("pharmacies", "graph", "buildings_demand", "access", "validation", "cms_check", "overture_extract"):
         path = DATA_REPORTS / f"{name}.json"
         if path.exists():
             reports[name] = json.loads(path.read_text(encoding="utf-8"))

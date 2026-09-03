@@ -15,6 +15,34 @@ export function hexAccess(
   };
 }
 
+export function isNewlyLost(
+  hex: Hex,
+  closedId: string | null,
+  mps: number,
+  threshold: number,
+): boolean {
+  if (!closedId || hex.nearestId !== closedId) return false;
+  const base = hexAccess(hex, null, mps);
+  const after = hexAccess(hex, closedId, mps);
+  return (
+    base.minutes != null &&
+    base.minutes <= threshold &&
+    (after.minutes == null || after.minutes > threshold)
+  );
+}
+
+export function searchPharmacies(
+  pharmacies: RxGapData["pharmacies"],
+  query: string,
+  limit = 10,
+) {
+  const q = query.trim().toLowerCase();
+  return pharmacies
+    .filter((p) => p.inStudyArea)
+    .filter((p) => !q || `${p.name} ${p.address} ${p.city}`.toLowerCase().includes(q))
+    .slice(0, limit);
+}
+
 export function weightedMedian(pairs: { value: number; weight: number }[]): number | null {
   const rows = pairs
     .filter((p) => p.weight > 0 && Number.isFinite(p.value))
@@ -42,16 +70,9 @@ export function impact(
 
   for (const hex of data.hexes) {
     const base = hexAccess(hex, null, pace.mps);
-    const after = hexAccess(hex, closedId, pace.mps);
     const hh = hex.households;
     if (base.minutes == null || base.minutes > threshold) alreadyHh += hh;
-    const newly =
-      Boolean(closedId) &&
-      hex.nearestId === closedId &&
-      base.minutes != null &&
-      base.minutes <= threshold &&
-      (after.minutes == null || after.minutes > threshold);
-    if (newly) newlyHh += hh;
+    if (isNewlyLost(hex, closedId, pace.mps, threshold)) newlyHh += hh;
     if (closedId && hex.nearestId === closedId && hex.nearestM != null && hex.secondM != null) {
       extra.push({ value: hex.secondM - hex.nearestM, weight: hh });
       if (hex.secondId) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { closureRank, impact, servedHouseholds, weightedMedian } from "./metrics";
+import { closureRank, impact, isNewlyLost, searchPharmacies, servedHouseholds, weightedMedian } from "./metrics";
 import type { RxGapData } from "./types";
 
 const pace = { id: "average" as const, label: "Average", mph: 3, mps: 1.34112, source: "test" };
@@ -115,5 +115,19 @@ describe("closureRank", () => {
   it("ranks only study-area pharmacies", () => {
     const rank = closureRank(data, "in", pace, 15);
     expect(rank).toEqual({ rank: 1, of: 1 });
+  });
+});
+
+describe("isNewlyLost", () => {
+  it("flags cells that cross the threshold after closure", () => {
+    expect(isNewlyLost(data.hexes[0], "in", pace.mps, 15)).toBe(true);
+    expect(isNewlyLost(data.hexes[1], "in", pace.mps, 15)).toBe(false);
+  });
+});
+
+describe("searchPharmacies", () => {
+  it("omits buffer pharmacies from the primary search", () => {
+    expect(searchPharmacies(data.pharmacies, "").map((p) => p.id)).toEqual(["in"]);
+    expect(searchPharmacies(data.pharmacies, "Quincy")).toEqual([]);
   });
 });

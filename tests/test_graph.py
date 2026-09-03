@@ -1,7 +1,8 @@
 import json
 import unittest
 
-from pipeline.graph import build_graph, parse_connectors
+from pipeline.config import WALKABLE_CLASSES
+from pipeline.graph import build_graph, keep_segment, parse_connectors
 import pandas as pd
 
 
@@ -73,6 +74,16 @@ class ConnectorTopology(unittest.TestCase):
         self.assertEqual(pack["n_edges"], 2)
         self.assertEqual(g[0, 2], 0)
         self.assertEqual(g[1, 3], 0)
+
+
+class WalkNetwork(unittest.TestCase):
+    def test_trunk_is_not_walkable_except_named_bridges(self):
+        self.assertNotIn("trunk", WALKABLE_CLASSES)
+        self.assertNotIn("motorway", WALKABLE_CLASSES)
+        self.assertTrue(keep_segment("trunk", "Longfellow Bridge"))
+        self.assertTrue(keep_segment("trunk", "Boston University Bridge"))
+        self.assertFalse(keep_segment("trunk", "Memorial Drive"))
+        self.assertTrue(keep_segment("residential", "Memorial Drive"))
 
 
 if __name__ == "__main__":

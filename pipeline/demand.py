@@ -164,6 +164,8 @@ def load_block_groups(con, cities: dict) -> pd.DataFrame:
                 "city": city,
                 "wkt": inter.wkt,
                 "area": inter.area,
+                "orig_area": geom.area,
+                "clip_ratio": (inter.area / geom.area) if geom.area else 1.0,
                 "lat": point.y,
                 "lon": point.x,
             }
@@ -228,6 +230,43 @@ def allocate_households(mapped: pd.DataFrame, bgs: pd.DataFrame) -> pd.DataFrame
     return selected
 
 
+PARTIAL_CLIP = 0.99
+MATERIAL_OUTSIDE = 0.01
+
+
+def clip_stats(bgs: pd.DataFrame) -> dict:
+    """How much ACS mass sits in block groups that are only partly in the study union."""
+    ratio = bgs["clip_ratio"].fillna(1).clip(lower=0, upper=1)
+    partial = ratio < PARTIAL_CLIP
+    nv = bgs["no_vehicle"].fillna(0)
+    moe = bgs["no_vehicle_moe"].fillna(0)
+    outside = float((nv * (1 - ratio)).sum())
+    total = float(nv.sum())
+    return {
+        "block_groups": int(len(bgs)),
+        "partial_clip_block_groups": int(partial.sum()),
+        "partial_clip_share": round(float(partial.mean()), 4) if len(bgs) else 0.0,
+        "no_vehicle_in_partial": round(float(nv[partial].sum()), 1),
+        "estimated_no_vehicle_outside_by_area": round(outside, 1),
+        "estimated_outside_share": round(outside / total, 4) if total else 0.0,
+        "min_clip_ratio": round(float(ratio.min()), 4) if len(bgs) else 1.0,
+        "no_vehicle_moe": round(float(np.sqrt((moe ** 2).sum())), 1),
+    }
+
+
+def apply_inside_allocation(bgs: pd.DataFrame, stats: dict) -> pd.DataFrame:
+    """If the clipped-away share is material, keep only the inside ACS share."""
+    out = bgs.copy()
+    if stats["estimated_outside_share"] >= MATERIAL_OUTSIDE:
+        ratio = out["clip_ratio"].fillna(1).clip(lower=0, upper=1)
+        out["no_vehicle"] = out["no_vehicle"] * ratio
+        out["no_vehicle_moe"] = out["no_vehicle_moe"] * ratio
+        stats["allocated_by_clip_ratio"] = True
+    else:
+        stats["allocated_by_clip_ratio"] = False
+    return out
+
+
 def run() -> pd.DataFrame:
     ensure_dirs()
     con = connect()
@@ -238,6 +277,13 @@ def run() -> pd.DataFrame:
     bgs["no_vehicle"] = bgs["no_vehicle"].fillna(0)
     bgs["no_vehicle_moe"] = bgs["no_vehicle_moe"].fillna(0)
     bgs["households"] = bgs["households"].fillna(0)
+    clips = clip_stats(bgs)
+    clips["residential_building_weight_outside_extract"] = 0.0
+    clips["note"] = (
+        "Buildings are extracted inside the study union, so residential weight "
+        "outside the window is unobserved. Area-based ACS share is the proxy."
+    )
+    bgs = apply_inside_allocation(bgs, clips)
 
     buildings = load_buildings(con, union.wkt)
     buildings["residential"] = buildings.apply(is_residential, axis=1)
@@ -287,6 +333,7 @@ def run() -> pd.DataFrame:
         "mass_conserved": True,
         "hexes": int(len(hexes)),
         "dasymetric_ok": bool(pd.to_numeric(buildings["num_floors"], errors="coerce").notna().mean() > 0.2 or pd.to_numeric(buildings["height"], errors="coerce").notna().mean() > 0.4),
+        "boundary_clip": clips,
     }
     hexes.to_csv(DATA_PROCESSED / "hexes.csv", index=False)
     bgs.to_csv(DATA_PROCESSED / "block_groups.csv", index=False)

@@ -37,10 +37,23 @@
   "num_floors_nonnull": 0.041,
   "height_nonnull": 0.894,
   "block_groups": 1414,
-  "no_vehicle_households": 161741.0,
-  "no_vehicle_moe": 3344.4,
+  "no_vehicle_households": 159358.1,
+  "no_vehicle_moe": 3312.7,
   "fallback_block_groups": 9,
   "mass_conserved": true,
   "hexes": 3311,
-  "dasymetric_ok": true
+  "dasymetric_ok": true,
+  "boundary_clip": {
+    "block_groups": 1414,
+    "partial_clip_block_groups": 110,
+    "partial_clip_share": 0.0778,
+    "no_vehicle_in_partial": 4921.0,
+    "estimated_no_vehicle_outside_by_area": 2382.9,
+    "estimated_outside_share": 0.0147,
+    "min_clip_ratio": 0.0,
+    "no_vehicle_moe": 3344.4,
+    "residential_building_weight_outside_extract": 0.0,
+    "note": "Buildings are extracted inside the study union, so residential weight outside the window is unobserved. Area-based ACS share is the proxy.",
+    "allocated_by_clip_ratio": true
+  }
 }

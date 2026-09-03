@@ -66,12 +66,12 @@ export function SidePanel({
           <div className="stat is-after">
             <span>Would lose a {threshold}-min walk</span>
             <b>+{formatHh(stats.newlyHh)}</b>
-            <p>no-vehicle households whose closest store is this one, and whose next option is too far</p>
+            <p>no-vehicle households whose modeled nearest pharmacy is this location, and whose next option is too far</p>
           </div>
           <div className="stat">
             <span>Typical extra walk</span>
             <b>{formatMin(stats.medianExtraMin)}</b>
-            <p>for households that used this as their closest pharmacy</p>
+            <p>for households whose modeled nearest pharmacy is this location</p>
           </div>
           {rank && (
             <div className="stat">
@@ -82,7 +82,7 @@ export function SidePanel({
           )}
           {stats.alternatives[0]?.pharmacy && (
             <div className="alts">
-              <p>Where they go next</p>
+              <p>Nearest alternatives after closure</p>
               <ul>
                 {stats.alternatives.map((alt) =>
                   alt.pharmacy ? (

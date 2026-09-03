@@ -18,6 +18,8 @@ from pipeline.config import (
     DATA_PROCESSED,
     DATA_RAW,
     DATA_REPORTS,
+    GRAPH_ROUTES,
+    GRAPH_SEEDS,
     REQUIRED_BRIDGES,
     WALKABLE_CLASSES,
     ensure_dirs,
@@ -25,6 +27,7 @@ from pipeline.config import (
 from pipeline.db import connect
 
 WALK_DENIED = re.compile(r"walk|foot|pedestrian", re.I)
+WALKABLE_TRUNK_NAME = re.compile(r"\b(?:bridge|overpass)\b", re.I)
 EARTH_M = 6371000.0
 
 
@@ -48,6 +51,13 @@ def _walk_denied(access_json) -> bool:
     if "walk" not in text and "foot" not in text and "pedestrian" not in text:
         return False
     return bool(re.search(r"(denied|no).{0,40}(walk|foot|pedestrian)|(walk|foot|pedestrian).{0,40}(denied|no)", text))
+
+
+def keep_segment(klass: str, name: str | None) -> bool:
+    """Walkable classes, plus trunk segments that are named bridges/overpasses."""
+    if klass in WALKABLE_CLASSES:
+        return True
+    return klass == "trunk" and bool(name and WALKABLE_TRUNK_NAME.search(str(name)))
 
 
 def parse_connectors(raw) -> list[tuple[str, float]]:
@@ -131,7 +141,7 @@ def point_at(coords: list[tuple[float, float]], at: float) -> tuple[float, float
 def load_segments() -> pd.DataFrame:
     path = DATA_RAW / "segments.parquet"
     con = connect()
-    classes = ", ".join(f"'{c}'" for c in sorted(WALKABLE_CLASSES))
+    classes = ", ".join(f"'{c}'" for c in sorted(WALKABLE_CLASSES | {"trunk"}))
     df = con.execute(
         f"""
         SELECT id, name, subtype, class, access_json, connectors_json, ST_AsText(geometry) AS wkt
@@ -141,7 +151,11 @@ def load_segments() -> pd.DataFrame:
         """
     ).df()
     df["access_json"] = df["access_json"].astype("string")
-    df = df[~df["access_json"].map(_walk_denied)]
+    keep = pd.Series(
+        [keep_segment(klass, name) for klass, name in zip(df["class"], df["name"])],
+        index=df.index,
+    )
+    df = df[keep & ~df["access_json"].map(_walk_denied)]
     return df
 
 
@@ -242,6 +256,25 @@ def main_component_mask(graph) -> np.ndarray:
     return labels == main
 
 
+def route_between(
+    graph,
+    coords: np.ndarray,
+    origin: tuple[float, float],
+    dest: tuple[float, float],
+) -> dict:
+    """Snap both ends the same way access does, then measure the graph path."""
+    o_idx, o_snap = nearest_reachable_node(graph, coords, origin[0], origin[1])
+    d_idx, d_snap = nearest_reachable_node(graph, coords, dest[0], dest[1])
+    dist = dijkstra(graph, directed=False, indices=o_idx, unweighted=False)
+    val = float(dist[d_idx])
+    return {
+        "modeled_m": None if np.isinf(val) else val,
+        "geodesic_m": _haversine_m(origin[0], origin[1], dest[0], dest[1]),
+        "snap_origin_m": o_snap,
+        "snap_dest_m": d_snap,
+    }
+
+
 def nearest_reachable_node(
     graph,
     coords: np.ndarray,
@@ -288,39 +321,20 @@ def report(graph_pack: dict, segments: pd.DataFrame) -> dict:
             ]
         bridge_hits[needle] = hits[:8]
 
-    seeds = {
-        "boston_city_hall": (42.3604, -71.0578),
-        "harvard_square": (42.3736, -71.1189),
-        "kendall": (42.3626, -71.0843),
-        "nubian": (42.3296, -71.0845),
-        "longfellow_boston": (42.3615, -71.0678),
-        "longfellow_cambridge": (42.3629, -71.0762),
-        "harvard_bridge_boston": (42.3540, -71.0875),
-        "harvard_bridge_cambridge": (42.3565, -71.0955),
-        "bu_boston": (42.3516, -71.1109),
-        "bu_cambridge": (42.3534, -71.1175),
-        "brookline_border": (42.3420, -71.1210),
-        "somerville_border": (42.3870, -71.1000),
-        "newton_border": (42.3370, -71.1500),
-    }
-    snapped = {k: nearest_node(coords, lat, lon) for k, (lat, lon) in seeds.items()} if graph.shape[0] else {}
-
-    def path_m(a: str, b: str) -> float | None:
-        src = snapped[a][0]
-        dst = snapped[b][0]
-        dist = dijkstra(graph, directed=False, indices=src, unweighted=False)
-        val = float(dist[dst])
-        return None if np.isinf(val) else val
-
-    routes = {
-        "boston_to_harvard_square_m": path_m("boston_city_hall", "harvard_square") if snapped else None,
-        "longfellow_cross_m": path_m("longfellow_boston", "longfellow_cambridge") if snapped else None,
-        "harvard_bridge_cross_m": path_m("harvard_bridge_boston", "harvard_bridge_cambridge") if snapped else None,
-        "bu_bridge_cross_m": path_m("bu_boston", "bu_cambridge") if snapped else None,
-        "boston_to_brookline_border_m": path_m("boston_city_hall", "brookline_border") if snapped else None,
-        "cambridge_to_somerville_border_m": path_m("harvard_square", "somerville_border") if snapped else None,
-        "boston_to_newton_border_m": path_m("boston_city_hall", "newton_border") if snapped else None,
-    }
+    measured = {}
+    routes = {key: None for key, _, _ in GRAPH_ROUTES}
+    if graph.shape[0]:
+        for key, origin, dest in GRAPH_ROUTES:
+            measured[key] = route_between(graph, coords, GRAPH_SEEDS[origin], GRAPH_SEEDS[dest])
+            routes[key] = measured[key]["modeled_m"]
+    snapped = (
+        {
+            name: nearest_reachable_node(graph, coords, lat, lon)
+            for name, (lat, lon) in GRAPH_SEEDS.items()
+        }
+        if graph.shape[0]
+        else {}
+    )
 
     passed = {
         "largest_component_dominant": largest_share >= 0.85,

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { searchPharmacies } from "../lib/metrics";
 import type { PaceId, Pharmacy, RxGapData } from "../lib/types";
 
 type Props = {
@@ -22,13 +23,10 @@ export function TopBar({
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const q = query.trim().toLowerCase();
-  const matches = useMemo(() => {
-    const list = data.pharmacies.filter(
-      (p) => !q || `${p.name} ${p.address} ${p.city}`.toLowerCase().includes(q),
-    );
-    return list.slice(0, 10);
-  }, [data.pharmacies, q]);
+  const matches = useMemo(
+    () => searchPharmacies(data.pharmacies, query),
+    [data.pharmacies, query],
+  );
 
   return (
     <header className="topbar">

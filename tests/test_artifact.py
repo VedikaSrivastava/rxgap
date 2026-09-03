@@ -65,3 +65,6 @@ class ArtifactContract(unittest.TestCase):
         self.assertTrue(reports["graph"]["all_pass"])
         self.assertTrue(reports["buildings_demand"]["mass_conserved"])
         self.assertEqual(reports["pharmacies"]["local_geocode_unresolved"], [])
+        if "validation" in reports:
+            self.assertIn("pairs", reports["validation"])
+            self.assertGreaterEqual(len(reports["validation"]["pairs"]), 5)

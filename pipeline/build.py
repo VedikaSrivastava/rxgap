@@ -36,11 +36,12 @@ def main() -> None:
 
         step("cms", cms_check.extract_ma)
 
-    from pipeline import extract_overture, pharmacies, graph, demand, access, export
+    from pipeline import extract_overture, pharmacies, graph, demand, access, validate, export
 
     step("overture", extract_overture.run)
     step("pharmacies", pharmacies.run)
     step("graph", graph.run)
+    step("validate", validate.run)
     step("demand", demand.run)
     step("access", access.run)
     step("export", export.run)

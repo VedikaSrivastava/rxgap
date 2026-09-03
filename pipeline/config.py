@@ -131,8 +131,9 @@ KNOWN_CLOSED_STOREFRONTS = (
     {"street": "416 warren", "city": "roxbury"},
 )
 
-# Overture road classes a pedestrian can typically use. Motorways are excluded;
-# walk-denied access_restrictions are filtered at extract time.
+# Overture road classes a pedestrian can typically use. Motorways are excluded.
+# Trunks are excluded unless the name is a bridge/overpass — Longfellow and the
+# BU Bridge are tagged trunk, and dropping them forced a detour.
 WALKABLE_CLASSES = {
     "footway",
     "path",
@@ -145,7 +146,6 @@ WALKABLE_CLASSES = {
     "tertiary",
     "secondary",
     "primary",
-    "trunk",
     "track",
     "cycleway",
     "bridleway",
@@ -155,13 +155,43 @@ WALKABLE_CLASSES = {
 # Named crossings that must survive in the pedestrian graph.
 REQUIRED_BRIDGES = ("Harvard", "Longfellow", "BU")
 
-# Hand-check walking pairs used in the spike report (origin_name, dest_hint).
+# Landmark / bridge-end seeds. Bridge points sit on sidewalks at each end,
+# not mid-channel, so continuity checks measure the crossing rather than a
+# detour from a poorly placed pin.
+GRAPH_SEEDS = {
+    "boston_city_hall": (42.3604, -71.0578),
+    "harvard_square": (42.3736, -71.1189),
+    "central_square": (42.3651, -71.1036),
+    "kendall": (42.3626, -71.0843),
+    "nubian": (42.3296, -71.0845),
+    "longfellow_boston": (42.36093, -71.07086),
+    "longfellow_cambridge": (42.36178, -71.07973),
+    "harvard_bridge_boston": (42.3515, -71.0897),
+    "harvard_bridge_cambridge": (42.3572, -71.0929),
+    "bu_boston": (42.3516, -71.1109),
+    "bu_cambridge": (42.3535, -71.1174),
+    "brookline_border": (42.3420, -71.1210),
+    "somerville_border": (42.3870, -71.1000),
+    "newton_border": (42.3370, -71.1500),
+}
+
+GRAPH_ROUTES = (
+    ("boston_to_harvard_square_m", "boston_city_hall", "harvard_square"),
+    ("longfellow_cross_m", "longfellow_boston", "longfellow_cambridge"),
+    ("harvard_bridge_cross_m", "harvard_bridge_boston", "harvard_bridge_cambridge"),
+    ("bu_bridge_cross_m", "bu_boston", "bu_cambridge"),
+    ("boston_to_brookline_border_m", "boston_city_hall", "brookline_border"),
+    ("cambridge_to_somerville_border_m", "harvard_square", "somerville_border"),
+    ("boston_to_newton_border_m", "boston_city_hall", "newton_border"),
+)
+
+# Landmark → nearest matching licensed pharmacy, used as walking-distance checks.
 WALK_CHECKS = (
-    ("Boston City Hall", "CVS"),
-    ("Harvard Square", "CVS"),
-    ("Central Square", "pharmacy"),
-    ("Nubian Square", "pharmacy"),
-    ("Kendall Square", "pharmacy"),
+    ("boston_city_hall", "CVS"),
+    ("harvard_square", "CVS"),
+    ("central_square", "pharmacy"),
+    ("nubian", "pharmacy"),
+    ("kendall", "pharmacy"),
 )
 
 ACS_YEAR = 2023

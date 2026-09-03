@@ -4,7 +4,7 @@ import unittest
 import pandas as pd
 from shapely.geometry import Point, box
 
-from pipeline.demand import allocate_households, assign_city, display_cousub_name
+from pipeline.demand import allocate_households, apply_inside_allocation, assign_city, clip_stats, display_cousub_name
 from pipeline.export import in_study_area
 
 class DemandAllocation(unittest.TestCase):
@@ -30,6 +30,39 @@ class DemandAllocation(unittest.TestCase):
         self.assertIn("unknown", set(out["id"]))
         self.assertIn("block-group:c", set(out["id"]))
         self.assertAlmostEqual(out["hh"].sum(), 60.0)
+
+
+class BoundaryClip(unittest.TestCase):
+    def test_tiny_clips_are_reported_and_left_alone(self):
+        bgs = pd.DataFrame(
+            {
+                "geoid": ["a", "b"],
+                "no_vehicle": [100.0, 100.0],
+                "no_vehicle_moe": [10.0, 10.0],
+                "clip_ratio": [1.0, 0.995],
+            }
+        )
+        stats = clip_stats(bgs)
+        out = apply_inside_allocation(bgs, stats)
+        self.assertEqual(stats["partial_clip_block_groups"], 0)
+        self.assertFalse(stats["allocated_by_clip_ratio"])
+        self.assertAlmostEqual(out["no_vehicle"].sum(), 200.0)
+
+    def test_material_clips_scale_acs_to_the_inside_share(self):
+        bgs = pd.DataFrame(
+            {
+                "geoid": ["a"],
+                "no_vehicle": [100.0],
+                "no_vehicle_moe": [10.0],
+                "clip_ratio": [0.5],
+            }
+        )
+        stats = clip_stats(bgs)
+        out = apply_inside_allocation(bgs, stats)
+        self.assertEqual(stats["partial_clip_block_groups"], 1)
+        self.assertTrue(stats["allocated_by_clip_ratio"])
+        self.assertAlmostEqual(out["no_vehicle"].sum(), 50.0)
+        self.assertAlmostEqual(out["no_vehicle_moe"].sum(), 5.0)
 
 
 class CityAssignment(unittest.TestCase):

@@ -26,3 +26,17 @@ export function minutesOpacity(
   if (simulating) return cover * 0.28;
   return beyond ? Math.max(0.4, cover * 0.85) : cover;
 }
+
+export function hexFill(
+  minutes: number | null,
+  households: number,
+  threshold: number,
+  newlyLost: boolean,
+  simulating: boolean,
+) {
+  const beyond = minutes == null || minutes > threshold;
+  return {
+    color: minutesColor(minutes, threshold, newlyLost, simulating),
+    opacity: minutesOpacity(households, newlyLost, simulating, beyond),
+  };
+}
