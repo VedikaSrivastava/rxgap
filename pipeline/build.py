@@ -36,8 +36,18 @@ def main() -> None:
 
         step("cms", cms_check.extract_ma)
 
-    from pipeline import extract_overture, pharmacies, graph, demand, access, validate, export
+    from pipeline import (
+        access,
+        demand,
+        export,
+        extract_overture,
+        geography,
+        graph,
+        pharmacies,
+        validate,
+    )
 
+    step("geography", geography.resolve)
     step("overture", extract_overture.run)
     step("pharmacies", pharmacies.run)
     step("graph", graph.run)

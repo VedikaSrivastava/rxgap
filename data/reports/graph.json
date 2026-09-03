@@ -1,29 +1,31 @@
 {
-  "nodes": 224704,
-  "undirected_edges": 323412,
-  "segments_used": 149173,
+  "nodes": 408967,
+  "undirected_edges": 560918,
+  "segments_used": 271513,
   "topology": "overture_connector_id",
-  "components": 660,
-  "largest_component_nodes": 221506,
-  "largest_component_share": 0.9858,
+  "components": 1196,
+  "largest_component_nodes": 404141,
+  "largest_component_share": 0.9882,
   "bridge_name_hits": {
     "Harvard": [
-      "Harvard Avenue",
       "Harvard Street",
-      "Harvard Terrace",
+      "Harvard Avenue",
       "Harvard Place",
+      "Harvard Drive",
+      "Harvard Park",
+      "Harvard Square",
       "Harvard Circle",
-      "Harvard Court",
-      "North Harvard Street",
-      "Harvard Way"
+      "Harvard Road"
     ],
     "Longfellow": [
+      "Longfellow Lane",
+      "Longfellow Street",
       "Longfellow Road",
-      "Longfellow Park",
+      "Longfellow Pond Trail",
       "Longfellow Bridge Trophy Room",
       "Longfellow Bridge",
       "Longfellow Place",
-      "Longfellow Street"
+      "Longfellow Park"
     ],
     "BU": [
       "Boston University Bridge"

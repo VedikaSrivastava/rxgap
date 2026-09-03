@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from shapely.geometry import box
-
 # Overture Maps release pinned for reproducibility.
 OVERTURE_RELEASE = "2026-08-19.0"
 OVERTURE_S3 = f"s3://overturemaps-us-west-2/release/{OVERTURE_RELEASE}"
@@ -14,56 +12,52 @@ OVERTURE_AZURE = (
     f"https://overturemapswestus2.blob.core.windows.net/release/{OVERTURE_RELEASE}"
 )
 
-# Product copy. Demand and simulatable pharmacies use every MA city/town that
-# intersects BBOX — the same window pharmacies are already plotted in — because
-# the Census Boston/Cambridge line is not how people actually move.
+# For this analysis, RxGap defines its Greater Boston study area as these
+# 22 complete municipalities. Demand and closable pharmacies live only here.
+# A 3 km routing envelope beyond the municipal union (see geography.py) is
+# used for network extract and context pharmacies — not for demand.
 STUDY_AREA_LABEL = "Greater Boston"
-STUDY_CITIES = ("Boston", "Cambridge")  # fallback if a demand report is missing
-BUFFER_KM = 3.0
-
-# Analysis window: Boston + Cambridge plus ~3 km. Demand, pharmacies, and the
-# walk graph all use this box. Exact municipal clipping uses county subdivisions.
-BBOX = {
-    "xmin": -71.227,
-    "ymin": 42.201,
-    "xmax": -70.886,
-    "ymax": 42.431,
-}
-
-# Board/NPPES "city" strings treated as local. Includes Boston neighborhoods
-# (often listed instead of Boston) and abutting municipalities in BBOX.
-LICENSE_CITY_ALIASES = (
+STUDY_MUNICIPALITIES = (
     "Boston",
     "Cambridge",
-    "Brookline",
     "Somerville",
+    "Brookline",
     "Newton",
     "Watertown",
-    "Chelsea",
-    "Everett",
-    "Medford",
-    "Arlington",
     "Belmont",
+    "Arlington",
+    "Medford",
+    "Malden",
+    "Everett",
+    "Chelsea",
     "Revere",
     "Winthrop",
-    "Malden",
+    "Lynn",
     "Quincy",
     "Milton",
+    "Braintree",
     "Dedham",
     "Needham",
     "Waltham",
+    "Weymouth",
+)
+STUDY_CITIES = STUDY_MUNICIPALITIES
+STUDY_MUNICIPALITY_NAMES = frozenset(name.lower() for name in STUDY_MUNICIPALITIES)
+BUFFER_KM = 3.0
+
+# Board/NPPES "city" strings for license fetch / geocode backfill only.
+# Study membership (inStudyArea / simulatable) is polygon covers() — never aliases.
+LICENSE_CITY_ALIASES = (
+    *STUDY_MUNICIPALITIES,
     "Westwood",
     "Wellesley",
     "Lexington",
     "Winchester",
     "Melrose",
     "Saugus",
-    "Lynn",
     "Nahant",
     "Hull",
     "Hingham",
-    "Weymouth",
-    "Braintree",
     "Randolph",
     "Canton",
     "Dorchester",
@@ -89,25 +83,40 @@ LICENSE_CITY_ALIASES = (
     "Newtonville",
     "Wollaston",
 )
-STUDY_PLACE_NAMES = frozenset(name.lower() for name in LICENSE_CITY_ALIASES)
 
-# Walking speeds are documented planning values, not a claim about who lives
-# in no-vehicle households. Default is Average.
+# Walking speeds are documented planning values. UX primary control is Max Walk;
+# speed is an Assumptions disclosure. Default is Standard (3 mph).
 #
-# Slow: 2.0 mph — MUTCD slower-walker design speed.
-# Average: 3.0 mph — common FHWA / pedestrian-planning walking speed.
-# Brisk: 4.0 mph — brisk adult walk.
+# Slower: 2.0 mph — MUTCD slower-walker design speed.
+# Standard: 3.0 mph — common FHWA / pedestrian-planning walking speed.
+# Faster: 4.0 mph — brisk adult walk.
 PACES = {
-    "slow": {"id": "slow", "label": "Slow", "mph": 2.0, "mps": 0.89408, "source": "MUTCD slower-walker (2.0 mph)"},
-    "average": {"id": "average", "label": "Average", "mph": 3.0, "mps": 1.34112, "source": "FHWA pedestrian planning speed (3.0 mph)"},
-    "brisk": {"id": "brisk", "label": "Brisk", "mph": 4.0, "mps": 1.78816, "source": "Brisk walk (4.0 mph)"},
+    "slow": {
+        "id": "slow",
+        "label": "Slower",
+        "mph": 2.0,
+        "mps": 0.89408,
+        "source": "MUTCD slower-walker (2.0 mph)",
+    },
+    "average": {
+        "id": "average",
+        "label": "Standard",
+        "mph": 3.0,
+        "mps": 1.34112,
+        "source": "FHWA pedestrian planning speed (3.0 mph)",
+    },
+    "brisk": {
+        "id": "brisk",
+        "label": "Faster",
+        "mph": 4.0,
+        "mps": 1.78816,
+        "source": "Brisk walk (4.0 mph)",
+    },
 }
 DEFAULT_PACE = "average"
 ACCESS_THRESHOLD_MINUTES = 15
 H3_RESOLUTION = 9
 
-# Currently licensed location comes from the MA Board retail roster.
-# NPPES taxonomy is type evidence, not operating status.
 MA_LICENSE_API = "https://healthprofessionlicensing-api.mass.gov/api-public"
 MA_PHARMACY_BOARD = "BOARD_OF_REGISTRATION_IN_PHARMACY"
 MA_RETAIL_EXPORT_PREFIX = "Retail_Pharmacy_License_Export_"
@@ -116,14 +125,13 @@ MA_ACTIVE_LICENSE_STATUSES = frozenset(
 )
 RETAIL_TAXONOMY = "3336C0003X"
 EXCLUDE_TAXONOMIES = {
-    "3336M0002X",  # Mail Order Pharmacy
-    "3336L0003X",  # Long Term Care Pharmacy
-    "3336N0007X",  # Nuclear Pharmacy
-    "3336I0012X",  # Institutional Pharmacy
-    "332B00000X",  # DME only, used when it is the only taxonomy
+    "3336M0002X",
+    "3336L0003X",
+    "3336N0007X",
+    "3336I0012X",
+    "332B00000X",
 }
 
-# Storefronts that must never appear as active. Pipeline fails if they do.
 KNOWN_CLOSED_STOREFRONTS = (
     {"street": "90 river", "city": "mattapan"},
     {"street": "1329 hyde park", "city": None},
@@ -131,9 +139,6 @@ KNOWN_CLOSED_STOREFRONTS = (
     {"street": "416 warren", "city": "roxbury"},
 )
 
-# Overture road classes a pedestrian can typically use. Motorways are excluded.
-# Trunks are excluded unless the name is a bridge/overpass — Longfellow and the
-# BU Bridge are tagged trunk, and dropping them forced a detour.
 WALKABLE_CLASSES = {
     "footway",
     "path",
@@ -152,12 +157,8 @@ WALKABLE_CLASSES = {
     "alley",
 }
 
-# Named crossings that must survive in the pedestrian graph.
 REQUIRED_BRIDGES = ("Harvard", "Longfellow", "BU")
 
-# Landmark / bridge-end seeds. Bridge points sit on sidewalks at each end,
-# not mid-channel, so continuity checks measure the crossing rather than a
-# detour from a poorly placed pin.
 GRAPH_SEEDS = {
     "boston_city_hall": (42.3604, -71.0578),
     "harvard_square": (42.3736, -71.1189),
@@ -185,7 +186,6 @@ GRAPH_ROUTES = (
     ("boston_to_newton_border_m", "boston_city_hall", "newton_border"),
 )
 
-# Landmark → nearest matching licensed pharmacy, used as walking-distance checks.
 WALK_CHECKS = (
     ("boston_city_hall", "CVS"),
     ("harvard_square", "CVS"),
@@ -211,6 +211,11 @@ DATA_PROCESSED = ROOT / "data" / "processed"
 DATA_REPORTS = ROOT / "data" / "reports"
 WEB_DATA = ROOT / "web" / "public" / "data"
 
+CITIES_GEOJSON = DATA_PROCESSED / "cities.geojson"
+ANALYSIS_ENVELOPE_GEOJSON = DATA_PROCESSED / "analysis_envelope.geojson"
+ANALYSIS_BBOX_PATH = DATA_PROCESSED / "analysis_bbox.json"
+GEOGRAPHY_REPORT = DATA_REPORTS / "geography.json"
+
 
 @dataclass(frozen=True)
 class Pace:
@@ -224,10 +229,6 @@ class Pace:
 def pace(name: str = DEFAULT_PACE) -> Pace:
     row = PACES[name]
     return Pace(**row)
-
-
-def bbox_polygon():
-    return box(BBOX["xmin"], BBOX["ymin"], BBOX["xmax"], BBOX["ymax"])
 
 
 def ensure_dirs() -> None:

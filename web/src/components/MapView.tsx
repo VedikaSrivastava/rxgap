@@ -189,6 +189,34 @@ export function MapView({
     popupRef.current = popup;
 
     const addLayers = () => {
+      if (!map.getSource("municipalities")) {
+        map.addSource("municipalities", {
+          type: "geojson",
+          data: { type: "FeatureCollection", features: [] },
+        });
+        map.addLayer(
+          {
+            id: "municipality-boundaries",
+            type: "line",
+            source: "municipalities",
+            paint: {
+              "line-color": "#1b2430",
+              "line-opacity": 0.18,
+              "line-width": 1,
+            },
+          },
+          "labels",
+        );
+        fetch("/data/cities.geojson")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((fc) => {
+            if (!fc || !map.getSource("municipalities")) return;
+            (map.getSource("municipalities") as maplibregl.GeoJSONSource).setData(fc);
+          })
+          .catch(() => {
+            // Outlines are contextual; map still works without them.
+          });
+      }
       if (!map.getSource("hexes")) {
         map.addSource("hexes", { type: "geojson", data: hexesRef.current });
         map.addLayer(
@@ -219,7 +247,7 @@ export function MapView({
           data: pharmaciesRef.current,
           cluster: true,
           clusterMaxZoom: CLUSTER_MAX_ZOOM,
-          clusterRadius: 46,
+          clusterRadius: 40,
         });
         map.addLayer({
           id: "pharm-clusters",
@@ -228,9 +256,10 @@ export function MapView({
           filter: ["has", "point_count"],
           paint: {
             "circle-color": "#1b2430",
-            "circle-stroke-width": 2,
+            "circle-opacity": 0.85,
+            "circle-stroke-width": 1.5,
             "circle-stroke-color": "#fff",
-            "circle-radius": ["step", ["get", "point_count"], 14, 4, 18, 10, 22, 25, 28],
+            "circle-radius": ["step", ["get", "point_count"], 12, 4, 15, 10, 19, 25, 24],
           },
         });
         map.addLayer({
@@ -269,7 +298,7 @@ export function MapView({
             layout: {
               "text-field": ["to-string", ["get", "point_count"]],
               "text-font": ["Noto Sans Regular"],
-              "text-size": 12,
+              "text-size": 11,
               "text-allow-overlap": true,
             },
             paint: { "text-color": "#fff" },

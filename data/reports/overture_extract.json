@@ -1,42 +1,94 @@
 {
   "overture_release": "2026-08-19.0",
   "bbox": {
-    "xmin": -71.227,
-    "ymin": 42.201,
-    "xmax": -70.886,
-    "ymax": 42.431
+    "xmin": -71.337335,
+    "ymin": 42.108502,
+    "xmax": -70.87195,
+    "ymax": 42.539205
   },
   "source": "s3",
   "layers": [
     {
       "file": "places.parquet",
-      "rows": 80293,
-      "skipped": true
+      "rows": 127528,
+      "skipped": false,
+      "columns": [
+        "id",
+        "geometry",
+        "name",
+        "category_primary",
+        "category_alternate",
+        "taxonomy_primary",
+        "taxonomy_json",
+        "basic_category",
+        "confidence",
+        "addresses_json"
+      ]
     },
     {
       "file": "segments.parquet",
-      "rows": 156335,
-      "skipped": true
+      "rows": 284035,
+      "skipped": false,
+      "columns": [
+        "id",
+        "geometry",
+        "name",
+        "subtype",
+        "class",
+        "subclass",
+        "connectors_json",
+        "access_json"
+      ]
     },
     {
       "file": "connectors.parquet",
-      "rows": 228593,
-      "skipped": true
+      "rows": 416538,
+      "skipped": false,
+      "columns": [
+        "id",
+        "geometry"
+      ]
     },
     {
       "file": "buildings.parquet",
-      "rows": 355396,
-      "skipped": true
+      "rows": 694504,
+      "skipped": false,
+      "columns": [
+        "id",
+        "geometry",
+        "name",
+        "subtype",
+        "class",
+        "height",
+        "num_floors"
+      ]
     },
     {
       "file": "addresses.parquet",
-      "rows": 909328,
-      "skipped": true
+      "rows": 1364227,
+      "skipped": false,
+      "columns": [
+        "id",
+        "geometry",
+        "number",
+        "street",
+        "country"
+      ]
     },
     {
       "file": "divisions.parquet",
-      "rows": 43,
-      "skipped": true
+      "rows": 78,
+      "skipped": false,
+      "columns": [
+        "id",
+        "geometry",
+        "name",
+        "subtype",
+        "class",
+        "country",
+        "region",
+        "division_id"
+      ]
     }
   ]
 }

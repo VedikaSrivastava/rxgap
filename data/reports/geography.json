@@ -1,0 +1,48 @@
+{
+  "study_area_label": "Greater Boston",
+  "requested": 22,
+  "resolved": 22,
+  "missing": [],
+  "municipalities": [
+    "Boston",
+    "Cambridge",
+    "Somerville",
+    "Brookline",
+    "Newton",
+    "Watertown",
+    "Belmont",
+    "Arlington",
+    "Medford",
+    "Malden",
+    "Everett",
+    "Chelsea",
+    "Revere",
+    "Winthrop",
+    "Lynn",
+    "Quincy",
+    "Milton",
+    "Braintree",
+    "Dedham",
+    "Needham",
+    "Waltham",
+    "Weymouth"
+  ],
+  "source_area_m2": 631819432.6,
+  "cached_area_m2": 631819432.6,
+  "study_union_area_m2": 631819432.6,
+  "envelope_area_m2": 1190419888.8,
+  "buffer_km": 3.0,
+  "crs_buffer": "EPSG:26986",
+  "bbox": {
+    "xmin": -71.337335,
+    "ymin": 42.108502,
+    "xmax": -70.87195,
+    "ymax": 42.539205
+  },
+  "artifacts": {
+    "cities": "D:/rxgap/data/processed/cities.geojson",
+    "envelope": "D:/rxgap/data/processed/analysis_envelope.geojson",
+    "bbox": "D:/rxgap/data/processed/analysis_bbox.json"
+  },
+  "note": "Study area is 22 complete municipalities. Demand and closable pharmacies are inside the study union only. Network extract uses the envelope bbox; context pharmacies must lie inside the true envelope polygon."
+}

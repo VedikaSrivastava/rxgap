@@ -113,8 +113,9 @@ export default function App() {
           </span>
           <p>
             Numbered circles are groups of stores — zoom in to see each one. A walk
-            over {threshold} min (at {pace.label.toLowerCase()} pace) counts as too far.
-            Today, about {formatHh(stats.alreadyHh)} no-vehicle households in{" "}
+            over {threshold} min (≈{((threshold * pace.mph) / 60).toFixed(2)} mi of walking
+            at {pace.label.toLowerCase()} pace) counts as too far. Today, about{" "}
+            {formatHh(stats.alreadyHh)} no-vehicle households in{" "}
             {data.meta.areaLabel ?? "this area"} are already past that.
           </p>
         </div>

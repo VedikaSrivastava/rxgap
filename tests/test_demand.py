@@ -4,8 +4,10 @@ import unittest
 import pandas as pd
 from shapely.geometry import Point, box
 
-from pipeline.demand import allocate_households, apply_inside_allocation, assign_city, clip_stats, display_cousub_name
+from pipeline.demand import allocate_households, apply_inside_allocation, assign_city, clip_stats
 from pipeline.export import in_study_area
+from pipeline.geography import display_cousub_name
+
 
 class DemandAllocation(unittest.TestCase):
     def test_prefers_residential_per_block_group_and_preserves_mass(self):
@@ -81,11 +83,19 @@ class CityAssignment(unittest.TestCase):
         self.assertEqual(display_cousub_name("Boston"), "Boston")
 
 
-class StudyAreaNames(unittest.TestCase):
-    def test_abutting_municipalities_count_as_study_area(self):
-        for city in ("Brookline", "Somerville", "Chelsea", "Quincy", "Newton"):
-            row = SimpleNamespace(city=city, lon=-71.1, lat=42.35)
-            self.assertTrue(in_study_area(row, None), city)
+class StudyAreaMembership(unittest.TestCase):
+    def test_city_string_alone_does_not_grant_study_membership(self):
+        row = SimpleNamespace(city="Newton", lon=-71.1, lat=42.35)
+        self.assertFalse(in_study_area(row, None))
+
+    def test_covers_includes_boundary_points(self):
+        union = box(0, 0, 1, 1)
+        on_edge = SimpleNamespace(city="Anywhere", lon=0.0, lat=0.5)
+        inside = SimpleNamespace(city="Anywhere", lon=0.5, lat=0.5)
+        outside = SimpleNamespace(city="Newton", lon=2.0, lat=2.0)
+        self.assertTrue(in_study_area(on_edge, union))
+        self.assertTrue(in_study_area(inside, union))
+        self.assertFalse(in_study_area(outside, union))
 
 
 if __name__ == "__main__":

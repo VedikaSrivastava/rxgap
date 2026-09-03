@@ -15,7 +15,6 @@ import pandas as pd
 import requests
 
 from pipeline.config import (
-    BBOX,
     DATA_PROCESSED,
     DATA_RAW,
     DATA_REPORTS,
@@ -31,6 +30,7 @@ from pipeline.config import (
     ensure_dirs,
 )
 from pipeline.db import connect
+from pipeline.geography import analysis_envelope, point_in_envelope
 
 NPPES = "https://npiregistry.cms.hhs.gov/api/"
 UA = {"User-Agent": "rxgap/0.1 (pharmacy access research)"}
@@ -231,7 +231,7 @@ def nominatim_refine(df: pd.DataFrame, cache: dict[str, list[float] | None] | No
         changed |= added
         if coords:
             candidate = (float(coords[0]), float(coords[1]))
-            if in_bbox(*candidate):
+            if in_analysis_envelope(*candidate):
                 dist = haversine_m(lat, lon, *candidate)
                 ov_m = getattr(row, "overture_m", None)
                 weak_overture = pd.notna(ov_m) and float(ov_m) > 45
@@ -256,7 +256,7 @@ def nominatim_backfill(df: pd.DataFrame) -> pd.DataFrame:
     for row in out.itertuples():
         coords, added = cached_nominatim(row, cache)
         changed |= added
-        if coords and in_bbox(float(coords[0]), float(coords[1])):
+        if coords and in_analysis_envelope(float(coords[0]), float(coords[1])):
             out.at[row.Index, "lat"] = float(coords[0])
             out.at[row.Index, "lon"] = float(coords[1])
     if changed:
@@ -645,8 +645,9 @@ def mark_duplicate_licenses(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def in_bbox(lat: float, lon: float) -> bool:
-    return BBOX["ymin"] <= lat <= BBOX["ymax"] and BBOX["xmin"] <= lon <= BBOX["xmax"]
+def in_analysis_envelope(lat: float, lon: float, envelope=None) -> bool:
+    """Retain pharmacy iff the geocoded point lies in the true buffered envelope."""
+    return point_in_envelope(lon, lat, envelope)
 
 
 def storefront_blob(df: pd.DataFrame) -> pd.Series:
@@ -729,7 +730,10 @@ def run() -> pd.DataFrame:
     unresolved_local = board[local_missing & board["lat"].isna()]
 
     board = board[board["lat"].notna() & board["lon"].notna()].copy()
-    board = board[board.apply(lambda r: in_bbox(float(r.lat), float(r.lon)), axis=1)]
+    envelope = analysis_envelope()
+    board = board[
+        board.apply(lambda r: in_analysis_envelope(float(r.lat), float(r.lon), envelope), axis=1)
+    ]
     board = match_nppes_near(board, nppes)
     board = board[~board["name"].fillna("").str.contains(MAIL_NAME)]
 
@@ -758,7 +762,7 @@ def run() -> pd.DataFrame:
         "local_geocode_unresolved": unresolved_local[
             ["license", "name", "address", "city"]
         ].to_dict("records"),
-        "licensed_geocoded_in_bbox": int(len(board)),
+        "licensed_geocoded_in_envelope": int(len(board)),
         "walk_in_storefronts": int(board["walk_in"].sum()),
         "display_only": int((~board["walk_in"]).sum()),
         "nppes_taxonomy_matched": int(board["has_retail_taxonomy"].sum()),

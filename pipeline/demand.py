@@ -11,22 +11,22 @@ import numpy as np
 import pandas as pd
 import requests
 from shapely import wkt as shapely_wkt
-from shapely.geometry import mapping
 from shapely.ops import unary_union
 from shapely.prepared import prep
 
 from pipeline.config import (
+    CITIES_GEOJSON,
     DATA_PROCESSED,
     DATA_RAW,
     DATA_REPORTS,
     H3_RESOLUTION,
     STUDY_AREA_LABEL,
-    bbox_polygon,
+    STUDY_MUNICIPALITIES,
     ensure_dirs,
 )
 from pipeline.db import connect
+from pipeline.geography import load_study_municipalities, read_cities_geojson
 
-TIGER_COUSUB = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_25_cousub_500k.zip"
 TIGER_BG = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_25_bg_500k.zip"
 ACS_B25044 = "https://www2.census.gov/programs-surveys/acs/summary_file/2023/table-based-SF/data/5YRData/acsdt5y2023-b25044.dat"
 
@@ -61,13 +61,6 @@ def _geom_col(con, shp: Path) -> str:
     return cols[-1]
 
 
-def display_cousub_name(name: str) -> str:
-    name = str(name).strip()
-    if name.lower().endswith(" town"):
-        return name[: -len(" town")].rstrip()
-    return name
-
-
 def assign_city(geom, cities: dict) -> str | None:
     """Prefer the municipality containing the centroid; else largest overlap."""
     centroid = geom.centroid
@@ -85,32 +78,19 @@ def assign_city(geom, cities: dict) -> str | None:
 
 
 def load_cities(con) -> dict:
-    """MA cities/towns that intersect the analysis bbox, clipped to that bbox."""
-    shp = _shp_from_zip(_download(TIGER_COUSUB, DATA_RAW / "cb_2023_25_cousub_500k.zip"))
-    geom = _geom_col(con, shp)
-    cities = con.execute(
-        f"""
-        SELECT NAME as name, ST_AsText({geom}) AS wkt
-        FROM ST_Read('{shp.as_posix()}')
-        """
-    ).df()
-    frame = bbox_polygon()
-    geoms: dict = {}
-    for row in cities.itertuples(index=False):
-        name = display_cousub_name(row.name)
-        if not name or "not defined" in name.lower():
-            continue
-        geom = shapely_wkt.loads(row.wkt)
-        if not geom.intersects(frame):
-            continue
-        clipped = geom.intersection(frame)
-        if clipped.is_empty:
-            continue
-        geoms[name] = unary_union([geoms[name], clipped]) if name in geoms else clipped
-    if not geoms:
-        raise RuntimeError("No county subdivisions intersect the analysis bbox")
-    print(f"Study municipalities in bbox: {len(geoms)} ({', '.join(sorted(geoms))})", flush=True)
-    return geoms
+    """Read resolved study municipalities (full polygons). Prefer cached artifact."""
+    if CITIES_GEOJSON.exists():
+        geoms = read_cities_geojson()
+    else:
+        geoms = load_study_municipalities(con)
+    missing = [name for name in STUDY_MUNICIPALITIES if name not in geoms]
+    if missing:
+        raise RuntimeError(f"Study municipalities missing from cities.geojson: {missing}")
+    print(
+        f"Study municipalities ({len(geoms)}): {', '.join(STUDY_MUNICIPALITIES)}",
+        flush=True,
+    )
+    return {name: geoms[name] for name in STUDY_MUNICIPALITIES}
 
 
 def load_acs() -> pd.DataFrame:
@@ -320,7 +300,7 @@ def run() -> pd.DataFrame:
 
     coverage = {
         "study_area_label": STUDY_AREA_LABEL,
-        "cities": sorted(cities),
+        "cities": list(STUDY_MUNICIPALITIES),
         "buildings_in_cities": int(len(buildings)),
         "residential_buildings": int(buildings["residential"].sum()) if "residential" in buildings.columns else int(len(res)),
         "residential_share": round(float(buildings["residential"].mean()), 3) if len(buildings) else 0,
@@ -337,14 +317,6 @@ def run() -> pd.DataFrame:
     }
     hexes.to_csv(DATA_PROCESSED / "hexes.csv", index=False)
     bgs.to_csv(DATA_PROCESSED / "block_groups.csv", index=False)
-    outlines = {
-        "type": "FeatureCollection",
-        "features": [
-            {"type": "Feature", "properties": {"name": name}, "geometry": mapping(geom)}
-            for name, geom in cities.items()
-        ],
-    }
-    (DATA_PROCESSED / "cities.geojson").write_text(json.dumps(outlines), encoding="utf-8")
     (DATA_REPORTS / "buildings_demand.json").write_text(json.dumps(coverage, indent=2), encoding="utf-8")
     print(json.dumps(coverage, indent=2), flush=True)
     return hexes

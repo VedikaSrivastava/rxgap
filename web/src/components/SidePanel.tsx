@@ -51,8 +51,8 @@ export function SidePanel({
               <p>no-vehicle households in {data.meta.areaLabel ?? "this area"}</p>
             </div>
             <p className="lead">
-              If it closes, those households walk to the next licensed pharmacy. A walk
-              over {threshold} minutes counts as losing access.
+              If it closes, those households walk to the next licensed pharmacy. Beyond
+              the max walk of {threshold} minutes, that counts as losing access.
             </p>
             <button className="cta" onClick={onSimulate}>
               Simulate closure
@@ -64,7 +64,7 @@ export function SidePanel({
       ) : (
         <>
           <div className="stat is-after">
-            <span>Would lose a {threshold}-min walk</span>
+            <span>Would lose a {threshold}-min max walk</span>
             <b>+{formatHh(stats.newlyHh)}</b>
             <p>no-vehicle households whose modeled nearest pharmacy is this location, and whose next option is too far</p>
           </div>

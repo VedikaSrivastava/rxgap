@@ -6,14 +6,13 @@ import json
 import shutil
 
 import pandas as pd
-from shapely.geometry import Point, shape
-from shapely.ops import unary_union
+from shapely.geometry import Point
 
 from pipeline.config import (
     ACCESS_THRESHOLD_MINUTES,
     ACS_YEAR,
-    BBOX,
     BUFFER_KM,
+    CITIES_GEOJSON,
     DATA_PROCESSED,
     DATA_REPORTS,
     DEFAULT_PACE,
@@ -21,24 +20,15 @@ from pipeline.config import (
     OVERTURE_RELEASE,
     PACES,
     STUDY_AREA_LABEL,
-    STUDY_CITIES,
-    STUDY_PLACE_NAMES,
+    STUDY_MUNICIPALITIES,
     WEB_DATA,
     ensure_dirs,
 )
-
-
-def study_union():
-    path = DATA_PROCESSED / "cities.geojson"
-    if not path.exists():
-        return None
-    fc = json.loads(path.read_text(encoding="utf-8"))
-    return unary_union([shape(f["geometry"]) for f in fc["features"]])
+from pipeline.geography import analysis_bbox, study_union
 
 
 def in_study_area(row, union) -> bool:
-    if str(row.city).strip().lower() in STUDY_PLACE_NAMES:
-        return True
+    """Polygon membership only — city-string aliases never grant study status."""
     if union is None:
         return False
     return bool(union.covers(Point(float(row.lon), float(row.lat))))
@@ -85,20 +75,30 @@ def run() -> None:
     pharmacies["in_study_area"] = pharmacies.apply(lambda r: in_study_area(r, union), axis=1)
 
     reports = {}
-    for name in ("pharmacies", "graph", "buildings_demand", "access", "validation", "cms_check", "overture_extract"):
+    for name in (
+        "geography",
+        "pharmacies",
+        "graph",
+        "buildings_demand",
+        "access",
+        "validation",
+        "cms_check",
+        "overture_extract",
+    ):
         path = DATA_REPORTS / f"{name}.json"
         if path.exists():
             reports[name] = json.loads(path.read_text(encoding="utf-8"))
     demand = reports.get("buildings_demand") or {}
+    bbox = analysis_bbox()
 
     payload = {
         "meta": {
             "title": "RxGap",
             "subtitle": "Pharmacy closure impact explorer",
             "areaLabel": demand.get("study_area_label") or STUDY_AREA_LABEL,
-            "cities": demand.get("cities") or list(STUDY_CITIES),
+            "cities": list(STUDY_MUNICIPALITIES),
             "bufferKm": BUFFER_KM,
-            "bbox": BBOX,
+            "bbox": bbox,
             "h3Resolution": H3_RESOLUTION,
             "thresholdMinutes": ACCESS_THRESHOLD_MINUTES,
             "defaultPace": DEFAULT_PACE,
@@ -107,9 +107,22 @@ def run() -> None:
             "acsYear": ACS_YEAR,
             "noVehicleHouseholds": demand.get("no_vehicle_households"),
             "noVehicleMoe": demand.get("no_vehicle_moe"),
-            "demand": "ACS 5-year no-vehicle households (B25044) with margins of error, allocated to residential-classified Overture buildings with block-group fallbacks, then aggregated to H3-9. Demand is clipped to MA cities and towns that intersect the analysis bbox.",
-            "network": "Overture transportation segments joined on connector_id, pedestrian-accessible classes, covering the analysis bbox. Distances include origin and destination snap legs.",
-            "pharmacies": "Currently licensed MA Board Retail Pharmacies with usable geocodes in the analysis bbox. Walk-in storefronts are used for routing; excluded licenses still appear with a reason.",
+            "demand": (
+                "ACS 5-year no-vehicle households (B25044) with margins of error, allocated to "
+                "residential-classified Overture buildings with block-group fallbacks, then aggregated "
+                "to H3-9. Demand exists only inside the 22-municipality study union — never in the "
+                "3 km routing buffer."
+            ),
+            "network": (
+                "Overture transportation segments joined on connector_id, pedestrian-accessible "
+                "classes, covering the analysis envelope (study union + 3 km in EPSG:26986). "
+                "Distances include origin and destination snap legs."
+            ),
+            "pharmacies": (
+                "Currently licensed MA Board Retail Pharmacies with geocodes inside the analysis "
+                "envelope polygon. Closable (simulatable) storefronts must also lie in the study "
+                "union; envelope-only pins are shown for routing context."
+            ),
             "reports": reports,
         },
         "pharmacies": [
@@ -143,9 +156,8 @@ def run() -> None:
         ],
     }
     (WEB_DATA / "rxgap.json").write_text(json.dumps(payload), encoding="utf-8")
-    cities = DATA_PROCESSED / "cities.geojson"
-    if cities.exists():
-        shutil.copyfile(cities, WEB_DATA / "cities.geojson")
+    if CITIES_GEOJSON.exists():
+        shutil.copyfile(CITIES_GEOJSON, WEB_DATA / "cities.geojson")
     study_n = sum(1 for p in payload["pharmacies"] if p["inStudyArea"])
     sim_n = sum(1 for p in payload["pharmacies"] if p["simulatable"])
     print(

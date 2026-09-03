@@ -98,10 +98,59 @@ html, body, #root { height: 100%; margin: 0; }
 .suggest b { display: block; font-size: 14px; }
 .suggest span { display: block; font-size: 12px; color: var(--muted); }
 
-.toggles { display: flex; gap: 12px; align-items: center; }
-.pace, .mins { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); }
-.pace select {
-  margin-top: 2px;
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+.max-walk {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.max-walk-title {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.max-walk-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--ink);
+}
+.max-walk-miles {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.max-walk input { accent-color: var(--ink); width: 100%; }
+.assumptions {
+  font-size: 11px;
+  color: var(--muted);
+}
+.assumptions summary {
+  cursor: pointer;
+  list-style: none;
+}
+.assumptions summary::-webkit-details-marker { display: none; }
+.assumptions summary::before {
+  content: "▸ ";
+}
+.assumptions[open] summary::before {
+  content: "▾ ";
+}
+.assumptions label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.assumptions select {
   border: 1px solid var(--line);
   background: #fff;
   padding: 5px 8px;
@@ -109,8 +158,6 @@ html, body, #root { height: 100%; margin: 0; }
   font-size: 13px;
   color: var(--ink);
 }
-.mins { min-width: 148px; }
-.mins input { accent-color: var(--ink); }
 
 .stage {
   position: relative;

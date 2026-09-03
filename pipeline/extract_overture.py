@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 
-from pipeline.config import BBOX, DATA_RAW, DATA_REPORTS, OVERTURE_RELEASE, ensure_dirs
+from pipeline.config import DATA_RAW, DATA_REPORTS, OVERTURE_RELEASE, ensure_dirs
 from pipeline.db import connect, parquet_url
+from pipeline.geography import analysis_bbox
 
 THEMES = (
     ("places", "place", "places.parquet"),
@@ -27,7 +28,7 @@ REQUIRED_COLUMNS = {
 
 
 def _bbox_sql(mode: str = "intersect") -> str:
-    b = BBOX
+    b = analysis_bbox()
     if mode == "points":
         return (
             f"bbox.xmin BETWEEN {b['xmin']} AND {b['xmax']} "
@@ -124,16 +125,22 @@ def extract_layer(con, theme: str, type_name: str, filename: str, azure: bool) -
         ]
         where += " AND country = 'US' AND region = 'US-MA' AND subtype IN ('locality', 'county')"
 
+    bbox = analysis_bbox()
+    meta_path = dest.with_suffix(dest.suffix + ".bbox.json")
     if dest.exists() and dest.stat().st_size > 1000:
-        local = con.execute(f"SELECT * FROM read_parquet('{dest.as_posix()}') LIMIT 0")
-        local_cols = {d[0] for d in local.description}
-        missing = REQUIRED_COLUMNS[type_name] - local_cols
-        if missing:
-            raise RuntimeError(f"{filename} is missing columns: {sorted(missing)}")
-        n = con.execute(f"SELECT count(*) FROM read_parquet('{dest.as_posix()}')").fetchone()[0]
-        if not n:
-            raise RuntimeError(f"{filename} is empty")
-        return {"file": filename, "rows": int(n), "skipped": True}
+        cached_bbox = None
+        if meta_path.exists():
+            cached_bbox = json.loads(meta_path.read_text(encoding="utf-8"))
+        if cached_bbox == bbox:
+            local = con.execute(f"SELECT * FROM read_parquet('{dest.as_posix()}') LIMIT 0")
+            local_cols = {d[0] for d in local.description}
+            missing = REQUIRED_COLUMNS[type_name] - local_cols
+            if missing:
+                raise RuntimeError(f"{filename} is missing columns: {sorted(missing)}")
+            n = con.execute(f"SELECT count(*) FROM read_parquet('{dest.as_posix()}')").fetchone()[0]
+            if not n:
+                raise RuntimeError(f"{filename} is empty")
+            return {"file": filename, "rows": int(n), "skipped": True}
 
     sql = f"""
         COPY (
@@ -143,6 +150,7 @@ def extract_layer(con, theme: str, type_name: str, filename: str, azure: bool) -
         ) TO '{dest.as_posix()}' (FORMAT PARQUET)
     """
     con.execute(sql)
+    meta_path.write_text(json.dumps(bbox, indent=2), encoding="utf-8")
     n = con.execute(f"SELECT count(*) FROM read_parquet('{dest.as_posix()}')").fetchone()[0]
     return {"file": filename, "rows": int(n), "skipped": False, "columns": [s.split(" AS ")[-1] for s in select]}
 
@@ -167,7 +175,7 @@ def run() -> dict:
 
     report = {
         "overture_release": OVERTURE_RELEASE,
-        "bbox": BBOX,
+        "bbox": analysis_bbox(),
         "source": "azure" if azure else "s3",
         "layers": stats,
     }

@@ -21,7 +21,7 @@ class ArtifactContract(unittest.TestCase):
         self.assertEqual(
             len(data["pharmacies"]),
             len(processed),
-            "artifact should include every licensed pharmacy in the bbox",
+            "artifact should include every licensed pharmacy in the analysis envelope",
         )
         self.assertGreater(len(study), 90, "study-area pharmacies should be exported")
         self.assertTrue(any(not p["simulatable"] for p in data["pharmacies"]))

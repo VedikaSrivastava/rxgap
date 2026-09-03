@@ -12,6 +12,10 @@ type Props = {
   onThreshold: (n: number) => void;
 };
 
+function walkMiles(threshold: number, mph: number) {
+  return threshold * (mph / 60);
+}
+
 export function TopBar({
   data,
   selected,
@@ -27,13 +31,16 @@ export function TopBar({
     () => searchPharmacies(data.pharmacies, query),
     [data.pharmacies, query],
   );
+  const pace = data.meta.paces[paceId];
+  const miles = walkMiles(threshold, pace.mph);
+  const paceWord = pace.label.toLowerCase();
 
   return (
     <header className="topbar">
       <div className="brand">
         <strong>RxGap</strong>
-        <span>{data.meta.areaLabel ?? data.meta.cities.join(" · ")}</span>
-        <p>Pick a store and see who loses a short walk if it closes.</p>
+        <span>{data.meta.areaLabel ?? "Greater Boston"}</span>
+        <p>See who loses walkable pharmacy access when a store closes.</p>
       </div>
 
       <div className="ask">
@@ -76,26 +83,39 @@ export function TopBar({
       </div>
 
       <div className="toggles">
-        <label className="pace">
-          Walk
-          <select value={paceId} onChange={(e) => onPace(e.target.value as PaceId)}>
-            {(Object.keys(data.meta.paces) as PaceId[]).map((id) => (
-              <option key={id} value={id}>
-                {data.meta.paces[id].label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="mins">
-          Too far after {threshold} min
+        <label className="max-walk">
+          <span className="max-walk-title">Max walk</span>
+          <span className="max-walk-value">
+            {threshold} min
+            <span className="max-walk-miles">
+              ≈{miles.toFixed(2)} mi of walking at {paceWord} pace
+            </span>
+          </span>
           <input
             type="range"
             min={10}
             max={30}
             value={threshold}
             onChange={(e) => onThreshold(Number(e.target.value))}
+            aria-label="Maximum walk in minutes"
           />
         </label>
+        <details className="assumptions">
+          <summary>Assumptions</summary>
+          <label>
+            Walking speed
+            <select value={paceId} onChange={(e) => onPace(e.target.value as PaceId)}>
+              {(Object.keys(data.meta.paces) as PaceId[]).map((id) => {
+                const p = data.meta.paces[id];
+                return (
+                  <option key={id} value={id}>
+                    {p.label} ({p.mph} mph)
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        </details>
       </div>
     </header>
   );
