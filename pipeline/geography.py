@@ -23,6 +23,7 @@ from pipeline.config import (
     CITIES_GEOJSON,
     DATA_RAW,
     GEOGRAPHY_REPORT,
+    ROOT,
     STUDY_AREA_LABEL,
     STUDY_MUNICIPALITIES,
     ensure_dirs,
@@ -226,9 +227,11 @@ def resolve() -> dict:
         "crs_buffer": CRS_MA,
         "bbox": bbox,
         "artifacts": {
-            "cities": str(CITIES_GEOJSON.as_posix()),
-            "envelope": str(ANALYSIS_ENVELOPE_GEOJSON.as_posix()),
-            "bbox": str(ANALYSIS_BBOX_PATH.as_posix()),
+            "cities": CITIES_GEOJSON.resolve().relative_to(ROOT.resolve()).as_posix(),
+            "envelope": ANALYSIS_ENVELOPE_GEOJSON.resolve()
+            .relative_to(ROOT.resolve())
+            .as_posix(),
+            "bbox": ANALYSIS_BBOX_PATH.resolve().relative_to(ROOT.resolve()).as_posix(),
         },
         "note": (
             "Study area is 22 complete municipalities. Demand and closable pharmacies "

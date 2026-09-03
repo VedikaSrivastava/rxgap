@@ -92,3 +92,15 @@ No transit, driving, delivery/mail-order, insurance networks, medication availab
 - Households near the study edge may have a nearer pharmacy in the routing envelope that is not closable in the tool.
 
 The pipeline refuses to finish if a known-closed storefront is marked active, if demand allocation drops households, or if the pedestrian graph fails continuity checks (including Boston–Cambridge crossings of the Charles).
+
+## License and citation
+
+Copyright © 2026 Vedika Srivastava.
+
+RxGap is licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). You may use, share, and adapt this work — including commercially — as long as you give appropriate credit, link to the license, and note if you changed anything.
+
+**Suggested citation:**
+
+> Srivastava, Vedika. (2026). *RxGap* [Computer software]. https://github.com/VedikaSrivastava/rxgap
+
+Third-party data (ACS, Overture, MA Board roster, etc.) and dependencies keep their own licenses and terms.

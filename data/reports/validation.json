@@ -1,9 +1,9 @@
 {
-  "router": "OSRM public foot profile",
+  "router": "external foot-routing reference",
   "router_url": "https://router.project-osrm.org",
   "osrm_reachable": true,
   "max_ratio": 1.5,
-  "note": "OSRM foot is the comparison router. When it detours more than 2\u00d7 straight-line (it often refuses a Charles crossing), geodesic is the gate.",
+  "note": "Sample walks are checked against geodesic length and an external foot-routing reference. When that reference detours more than 2\u00d7 straight-line (it often refuses a Charles crossing), geodesic is the gate. These checks are diagnostics, not the production distance model.",
   "pairs": [
     {
       "name": "boston_to_harvard_square_m",

@@ -104,7 +104,7 @@ export default function App() {
                 <i className="swatch coral" /> closing
               </span>
               <span>
-                <i className="swatch teal" /> next closest
+                <i className="swatch amber" /> next closest
               </span>
             </>
           )}

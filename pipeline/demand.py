@@ -156,12 +156,15 @@ def load_block_groups(con, cities: dict) -> pd.DataFrame:
 def load_buildings(con, union_wkt: str) -> pd.DataFrame:
     path = DATA_RAW / "buildings.parquet"
     con.execute("CREATE OR REPLACE TABLE city_union AS SELECT ST_GeomFromText(?) AS geom", [union_wkt])
+    # ST_Area is on geographic coordinates (not projected m²). The value is used
+    # only as a relative weight within each block group, where CRS scale is nearly
+    # common across footprints, so absolute units do not matter for allocation.
     return con.execute(
         f"""
         SELECT id, subtype, class, height, num_floors,
                ST_X(ST_Centroid(geometry)) AS lon,
                ST_Y(ST_Centroid(geometry)) AS lat,
-               ST_Area(geometry) AS area_m2
+               ST_Area(geometry) AS area_weight
         FROM read_parquet('{path.as_posix()}')
         WHERE ST_Intersects(ST_Centroid(geometry), (SELECT geom FROM city_union))
         """
@@ -269,7 +272,7 @@ def run() -> pd.DataFrame:
     buildings["residential"] = buildings.apply(is_residential, axis=1)
     floors = pd.to_numeric(buildings["num_floors"], errors="coerce").to_numpy(dtype="float64")
     height = pd.to_numeric(buildings["height"], errors="coerce").to_numpy(dtype="float64")
-    area = pd.to_numeric(buildings["area_m2"], errors="coerce").to_numpy(dtype="float64")
+    area = pd.to_numeric(buildings["area_weight"], errors="coerce").to_numpy(dtype="float64")
     floors = np.where(np.isnan(floors), np.where(np.isnan(height), 1.0, np.maximum(height / 3.1, 1.0)), floors)
     floors = np.clip(floors, 1.0, None)
     area = np.where(np.isnan(area) | (area <= 0), 80.0, area)

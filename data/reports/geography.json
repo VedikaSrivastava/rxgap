@@ -40,9 +40,9 @@
     "ymax": 42.539205
   },
   "artifacts": {
-    "cities": "D:/rxgap/data/processed/cities.geojson",
-    "envelope": "D:/rxgap/data/processed/analysis_envelope.geojson",
-    "bbox": "D:/rxgap/data/processed/analysis_bbox.json"
+    "cities": "data/processed/cities.geojson",
+    "envelope": "data/processed/analysis_envelope.geojson",
+    "bbox": "data/processed/analysis_bbox.json"
   },
   "note": "Study area is 22 complete municipalities. Demand and closable pharmacies are inside the study union only. Network extract uses the envelope bbox; context pharmacies must lie inside the true envelope polygon."
 }

@@ -1,4 +1,4 @@
-"""Compare modeled walking distances to a public walking router."""
+"""Compare modeled walking distances to geodesic and an external foot-routing reference."""
 
 from __future__ import annotations
 
@@ -166,13 +166,15 @@ def run() -> dict:
         and not within_ratio(row["modeled_m"], row["geodesic_m"], BRIDGE_GEODESIC_MAX)
     ]
     summary = {
-        "router": "OSRM public foot profile",
+        "router": "external foot-routing reference",
         "router_url": "https://router.project-osrm.org",
         "osrm_reachable": osrm_ok,
         "max_ratio": MAX_RATIO,
         "note": (
-            "OSRM foot is the comparison router. When it detours more than 2× "
-            "straight-line (it often refuses a Charles crossing), geodesic is the gate."
+            "Sample walks are checked against geodesic length and an external "
+            "foot-routing reference. When that reference detours more than 2× "
+            "straight-line (it often refuses a Charles crossing), geodesic is the "
+            "gate. These checks are diagnostics, not the production distance model."
         ),
         "pairs": pairs,
         "landmark_pharmacies": landmarks,
@@ -184,7 +186,10 @@ def run() -> dict:
     if bridge_bad:
         raise RuntimeError(f"Bridge walks are far from geodesic: {bridge_bad}")
     if flagged:
-        print("VALIDATION: one or more walking distances disagree with OSRM/geodesic.")
+        print(
+            "VALIDATION: one or more walking distances disagree with "
+            "the external foot-routing reference / geodesic."
+        )
     return summary
 
 

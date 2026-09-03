@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+title: "RxGap"
+message: "If you use RxGap, please cite it as below."
+type: software
+authors:
+  - family-names: Srivastava
+    given-names: Vedika
+repository-code: "https://github.com/VedikaSrivastava/rxgap"
+url: "https://rxgap.vercel.app/"
+abstract: >-
+  A pharmacy closure impact explorer for Greater Boston. Simulate closing a
+  licensed walk-in pharmacy and see how walkable access changes for
+  no-vehicle households.
+license: CC-BY-4.0
+version: "1.0.0"
+date-released: "2026-09-03"

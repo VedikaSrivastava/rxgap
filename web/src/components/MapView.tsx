@@ -3,7 +3,7 @@ import * as maplibregl from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { cellToBoundary } from "h3-js";
 import { hexFill } from "../lib/colors";
-import { hexAccess, isNewlyLost } from "../lib/metrics";
+import { formatHh, formatWalk, hexAccess, isNewlyLost } from "../lib/metrics";
 import type { Pace, Pharmacy, RxGapData } from "../lib/types";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -65,22 +65,40 @@ function hexCollection(
   closedId: string | null,
   mps: number,
   threshold: number,
+  names: Map<string, string>,
 ) {
   const simulating = Boolean(closedId);
   return {
     type: "FeatureCollection" as const,
     features: hexes.map((hex, i) => {
+      const before = hexAccess(hex, null, mps);
       const access = hexAccess(hex, closedId, mps);
+      const newlyLost = isNewlyLost(hex, closedId, mps, threshold);
       const paint = hexFill(
         access.minutes,
         hex.households,
         threshold,
-        isNewlyLost(hex, closedId, mps, threshold),
+        newlyLost,
         simulating,
       );
+      let status = "";
+      if (simulating) {
+        if (newlyLost) status = "Newly lost";
+        else if (access.minutes != null && access.minutes <= threshold) status = "Still walkable";
+        else status = "Too far";
+      }
       return {
         type: "Feature" as const,
-        properties: paint,
+        id: i,
+        properties: {
+          ...paint,
+          inspect: simulating && hex.households > 0 ? 1 : 0,
+          status,
+          households: hex.households,
+          minutes: access.minutes,
+          beforeMinutes: before.minutes,
+          pharmacy: access.pharmacyId ? names.get(access.pharmacyId) ?? "" : "",
+        },
         geometry: { type: "Polygon" as const, coordinates: [rings[i]] },
       };
     }),
@@ -109,18 +127,31 @@ function pharmacyCollection(
   const alts = new Set(altIds);
   return {
     type: "FeatureCollection" as const,
-    features: pharmacies.map((p) => ({
-      type: "Feature" as const,
-      id: p.id,
-      properties: {
+    features: pharmacies.map((p) => {
+      const role = pharmacyRole(p, selectedId, alts, simulating);
+      return {
+        type: "Feature" as const,
         id: p.id,
-        name: p.name,
-        address: p.address,
-        reason: p.excludeReason ?? "",
-        role: pharmacyRole(p, selectedId, alts, simulating),
-      },
-      geometry: { type: "Point" as const, coordinates: [p.lon, p.lat] },
-    })),
+        properties: {
+          id: p.id,
+          name: p.name,
+          address: p.address,
+          reason: p.excludeReason ?? "",
+          role,
+          roleLabel:
+            role === "closed"
+              ? "Closing"
+              : role === "alt"
+                ? "Next closest"
+                : role === "excluded"
+                  ? "Can't simulate"
+                  : role === "buffer"
+                    ? "Nearby context"
+                    : "",
+        },
+        geometry: { type: "Point" as const, coordinates: [p.lon, p.lat] },
+      };
+    }),
   };
 }
 
@@ -128,6 +159,67 @@ function esc(text: string) {
   return text.replace(/[&<>"']/g, (ch) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!,
   );
+}
+
+function numProp(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function hexTipHtml(props: Record<string, unknown>): string {
+  const status = String(props.status ?? "");
+  const hh = numProp(props.households) ?? 0;
+  const minutes = numProp(props.minutes);
+  const before = numProp(props.beforeMinutes);
+  const pharmacy = String(props.pharmacy ?? "");
+  const walk =
+    before != null && minutes != null && Math.round(before) !== Math.round(minutes)
+      ? `${formatWalk(before)} → ${formatWalk(minutes)}`
+      : formatWalk(minutes);
+  return [
+    status ? `<b>${esc(status)}</b>` : "",
+    `<span>${esc(formatHh(hh))} no-vehicle households</span>`,
+    `<span>Walk ${esc(walk)}</span>`,
+    pharmacy ? `<span>${esc(pharmacy)}</span>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+}
+
+function pharmacyTipHtml(props: Record<string, unknown>): string {
+  const name = String(props.name ?? "");
+  const roleLabel = String(props.roleLabel ?? "");
+  const extra = props.reason
+    ? String(props.reason)
+    : String(props.address ?? "");
+  if (roleLabel) {
+    return `<b>${esc(roleLabel)}</b><span>${esc(name)}</span>${
+      extra ? `<span>${esc(extra)}</span>` : ""
+    }`;
+  }
+  return `<b>${esc(name)}</b>${extra ? `<span>${esc(extra)}</span>` : ""}`;
+}
+
+/** Lon/lat bounds from a GeoJSON FeatureCollection (study municipalities). */
+function collectionBounds(fc: {
+  features?: Array<{ geometry?: { coordinates?: unknown } | null }>;
+}): maplibregl.LngLatBounds | null {
+  const bounds = new maplibregl.LngLatBounds();
+  let empty = true;
+  const visit = (coords: unknown) => {
+    if (!Array.isArray(coords) || coords.length === 0) return;
+    if (typeof coords[0] === "number" && typeof coords[1] === "number") {
+      bounds.extend([coords[0] as number, coords[1] as number]);
+      empty = false;
+      return;
+    }
+    for (const part of coords) visit(part);
+  };
+  for (const feature of fc.features ?? []) {
+    visit(feature.geometry?.coordinates);
+  }
+  return empty ? null : bounds;
 }
 
 export function MapView({
@@ -143,12 +235,17 @@ export function MapView({
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onSelectRef = useRef(onSelect);
+  const simulatingRef = useRef(simulating);
 
   const closedId = simulating ? selectedId : null;
+  const names = useMemo(
+    () => new Map(data.pharmacies.map((p) => [p.id, p.name])),
+    [data.pharmacies],
+  );
   const rings = useMemo(() => data.hexes.map((hex) => hexRing(hex.h3)), [data.hexes]);
   const hexes = useMemo(
-    () => hexCollection(data.hexes, rings, closedId, pace.mps, threshold),
-    [data.hexes, rings, closedId, pace.mps, threshold],
+    () => hexCollection(data.hexes, rings, closedId, pace.mps, threshold, names),
+    [data.hexes, rings, closedId, pace.mps, threshold, names],
   );
   const pharmacies = useMemo(
     () => pharmacyCollection(data.pharmacies, selectedId, altIds, simulating),
@@ -159,9 +256,10 @@ export function MapView({
 
   useEffect(() => {
     onSelectRef.current = onSelect;
+    simulatingRef.current = simulating;
     hexesRef.current = hexes;
     pharmaciesRef.current = pharmacies;
-  }, [onSelect, hexes, pharmacies]);
+  }, [onSelect, simulating, hexes, pharmacies]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -174,8 +272,9 @@ export function MapView({
     const map = new maplibregl.Map({
       container: el,
       style: BASEMAP,
-      center: [-71.10, 42.345],
-      zoom: 11.4,
+      // Placeholder until cities.geojson loads; fitBounds then frames the 22 municipalities.
+      center: [-71.105, 42.324],
+      zoom: 9.6,
       maxZoom: MAX_ZOOM,
       attributionControl: { compact: true },
     });
@@ -212,6 +311,14 @@ export function MapView({
           .then((fc) => {
             if (!fc || !map.getSource("municipalities")) return;
             (map.getSource("municipalities") as maplibregl.GeoJSONSource).setData(fc);
+            const bounds = collectionBounds(fc);
+            if (bounds) {
+              map.fitBounds(bounds, {
+                padding: { top: 56, bottom: 72, left: 28, right: 28 },
+                maxZoom: 12,
+                duration: 0,
+              });
+            }
           })
           .catch(() => {
             // Outlines are contextual; map still works without them.
@@ -226,7 +333,12 @@ export function MapView({
             source: "hexes",
             paint: {
               "fill-color": ["get", "color"],
-              "fill-opacity": ["get", "opacity"],
+              "fill-opacity": [
+                "case",
+                ["boolean", ["feature-state", "hover"], false],
+                ["min", 1, ["*", ["get", "opacity"], 1.55]],
+                ["get", "opacity"],
+              ],
             },
           },
           "labels",
@@ -236,7 +348,21 @@ export function MapView({
             id: "hex-line",
             type: "line",
             source: "hexes",
-            paint: { "line-color": "#1b2430", "line-opacity": 0.07, "line-width": 0.4 },
+            paint: {
+              "line-color": "#1b2430",
+              "line-opacity": [
+                "case",
+                ["boolean", ["feature-state", "hover"], false],
+                0.72,
+                0.07,
+              ],
+              "line-width": [
+                "case",
+                ["boolean", ["feature-state", "hover"], false],
+                1.8,
+                0.4,
+              ],
+            },
           },
           "labels",
         );
@@ -245,6 +371,7 @@ export function MapView({
         map.addSource("pharmacies", {
           type: "geojson",
           data: pharmaciesRef.current,
+          promoteId: "id",
           cluster: true,
           clusterMaxZoom: CLUSTER_MAX_ZOOM,
           clusterRadius: 40,
@@ -276,17 +403,47 @@ export function MapView({
               "closed",
               "#fff",
               "alt",
-              "#2a7a72",
+              "#c4841a",
               "buffer",
               "#8a9199",
               "excluded",
               "#9aa3ad",
               "#1b2430",
             ],
-            "circle-radius": ["match", ["get", "role"], "selected", 8, "closed", 8, "alt", 7, 6],
-            "circle-stroke-width": ["match", ["get", "role"], "closed", 3, 2],
-            "circle-stroke-color": ["match", ["get", "role"], "closed", "#c4452d", "#fff"],
+            "circle-radius": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              ["match", ["get", "role"], "selected", 10, "closed", 10, "alt", 10, 8],
+              ["match", ["get", "role"], "selected", 8, "closed", 8, "alt", 8, 6],
+            ],
+            "circle-stroke-width": [
+              "case",
+              ["boolean", ["feature-state", "hover"], false],
+              ["match", ["get", "role"], "closed", 3.5, "alt", 3, 2.5],
+              ["match", ["get", "role"], "closed", 3, "alt", 2.5, 2],
+            ],
+            "circle-stroke-color": [
+              "match",
+              ["get", "role"],
+              "closed",
+              "#c4452d",
+              "alt",
+              "#fffaf0",
+              "#fff",
+            ],
             "circle-opacity": ["match", ["get", "role"], "buffer", 0.55, "excluded", 0.8, 1],
+          },
+        });
+        // Invisible larger target so pins win over hex fill under the cursor.
+        map.addLayer({
+          id: "pharm-hit",
+          type: "circle",
+          source: "pharmacies",
+          filter: ["!", ["has", "point_count"]],
+          paint: {
+            "circle-radius": 16,
+            "circle-opacity": 0,
+            "circle-stroke-width": 0,
           },
         });
         try {
@@ -313,6 +470,28 @@ export function MapView({
     if (map.loaded()) addLayers();
     else map.on("load", addLayers);
 
+    let hoveredHexId: number | null = null;
+    let hoveredPharmId: string | number | null = null;
+
+    const clearHexHover = () => {
+      if (hoveredHexId == null || !map.getSource("hexes")) return;
+      map.setFeatureState({ source: "hexes", id: hoveredHexId }, { hover: false });
+      hoveredHexId = null;
+    };
+
+    const clearPharmHover = () => {
+      if (hoveredPharmId == null || !map.getSource("pharmacies")) return;
+      map.setFeatureState({ source: "pharmacies", id: hoveredPharmId }, { hover: false });
+      hoveredPharmId = null;
+    };
+
+    const clearHover = () => {
+      clearHexHover();
+      clearPharmHover();
+      map.getCanvas().style.cursor = "";
+      popup.remove();
+    };
+
     map.on("click", "pharm-clusters", (e) => {
       const feature = e.features?.[0];
       if (!feature || feature.geometry.type !== "Point") return;
@@ -324,34 +503,75 @@ export function MapView({
       });
     });
 
+    map.on("click", "pharm-hit", (e) => {
+      const id = e.features?.[0]?.properties?.id;
+      if (id) onSelectRef.current(String(id));
+    });
     map.on("click", "pharm-points", (e) => {
       const id = e.features?.[0]?.properties?.id;
       if (id) onSelectRef.current(String(id));
     });
 
-    map.on("mouseenter", "pharm-clusters", () => {
-      map.getCanvas().style.cursor = "pointer";
+    // Stores first, then hexes — otherwise hex mousemove steals the pin tip.
+    map.on("mousemove", (e) => {
+      const storeLayers = ["pharm-hit", "pharm-points", "pharm-clusters"].filter((id) =>
+        map.getLayer(id),
+      );
+      const store = storeLayers.length
+        ? map.queryRenderedFeatures(e.point, { layers: storeLayers })[0]
+        : undefined;
+
+      if (store?.properties && store.geometry.type === "Point") {
+        clearHexHover();
+        if (store.properties.point_count != null) {
+          clearPharmHover();
+          map.getCanvas().style.cursor = "pointer";
+          popup.remove();
+          return;
+        }
+        const id = (store.id ?? store.properties.id) as string | number;
+        if (id != null && id !== hoveredPharmId) {
+          clearPharmHover();
+          hoveredPharmId = id;
+          map.setFeatureState({ source: "pharmacies", id }, { hover: true });
+        }
+        map.getCanvas().style.cursor = "pointer";
+        popup
+          .setLngLat(store.geometry.coordinates as [number, number])
+          .setHTML(pharmacyTipHtml(store.properties as Record<string, unknown>))
+          .addTo(map);
+        return;
+      }
+
+      clearPharmHover();
+
+      if (!simulatingRef.current || !map.getLayer("hex-fill")) {
+        clearHexHover();
+        map.getCanvas().style.cursor = "";
+        popup.remove();
+        return;
+      }
+
+      const hex = map.queryRenderedFeatures(e.point, { layers: ["hex-fill"] })[0];
+      const props = (hex?.properties ?? {}) as Record<string, unknown>;
+      if (!hex || !Number(props.inspect) || hex.id == null) {
+        clearHexHover();
+        map.getCanvas().style.cursor = "";
+        popup.remove();
+        return;
+      }
+
+      const id = Number(hex.id);
+      if (id !== hoveredHexId) {
+        clearHexHover();
+        hoveredHexId = id;
+        map.setFeatureState({ source: "hexes", id }, { hover: true });
+      }
+      map.getCanvas().style.cursor = "help";
+      popup.setLngLat(e.lngLat).setHTML(hexTipHtml(props)).addTo(map);
     });
-    map.on("mouseleave", "pharm-clusters", () => {
-      map.getCanvas().style.cursor = "";
-    });
-    map.on("mouseenter", "pharm-points", (e) => {
-      map.getCanvas().style.cursor = "pointer";
-      const feature = e.features?.[0];
-      if (!feature || feature.geometry.type !== "Point") return;
-      const props = feature.properties ?? {};
-      const extra = props.reason
-        ? `<span>${esc(String(props.reason))}</span>`
-        : `<span>${esc(String(props.address ?? ""))}</span>`;
-      popup
-        .setLngLat(feature.geometry.coordinates as [number, number])
-        .setHTML(`<b>${esc(String(props.name ?? ""))}</b>${extra}`)
-        .addTo(map);
-    });
-    map.on("mouseleave", "pharm-points", () => {
-      map.getCanvas().style.cursor = "";
-      popup.remove();
-    });
+
+    map.on("mouseout", clearHover);
 
     const ro = new ResizeObserver(() => map.resize());
     ro.observe(el);
@@ -377,6 +597,10 @@ export function MapView({
     if (!map?.getSource("pharmacies")) return;
     (map.getSource("pharmacies") as maplibregl.GeoJSONSource).setData(pharmacies);
   }, [pharmacies]);
+
+  useEffect(() => {
+    if (!simulating) popupRef.current?.remove();
+  }, [simulating]);
 
   useEffect(() => {
     const map = mapRef.current;

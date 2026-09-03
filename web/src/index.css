@@ -3,7 +3,7 @@
   --muted: #5c6570;
   --line: rgba(27, 36, 48, 0.12);
   --coral: #c4452d;
-  --teal: #2a7a72;
+  --amber: #c4841a;
   --paper: #f7f5f1;
   --card: #fffcf8;
   font-family: "Source Sans 3", sans-serif;
@@ -258,6 +258,7 @@ html, body, #root { height: 100%; margin: 0; }
 }
 .alts ul { list-style: none; margin: 0 0 12px; padding: 0; }
 .alts li { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 4px 0; }
+.alts b { color: var(--amber); font-weight: 600; }
 .alts span { color: var(--muted); }
 
 .cta, .ghost {
@@ -327,7 +328,7 @@ html, body, #root { height: 100%; margin: 0; }
 .swatch.beyond { background: #d4a090; }
 .swatch.cell { border-radius: 2px; width: 10px; height: 10px; }
 .swatch.gray { background: #9aa3ad; }
-.swatch.teal { background: var(--teal); }
+.swatch.amber { background: var(--amber); }
 .swatch.coral { background: var(--coral); }
 
 .pharm-dot {
@@ -352,9 +353,11 @@ html, body, #root { height: 100%; margin: 0; }
   border: 3px solid var(--coral);
 }
 .pharm-dot.is-alt {
-  width: 14px;
-  height: 14px;
-  background: var(--teal);
+  width: 15px;
+  height: 15px;
+  background: var(--amber);
+  border-color: #fffaf0;
+  box-shadow: 0 0 0 1.5px rgba(196, 132, 26, 0.45), 0 1px 4px rgba(27, 36, 48, 0.35);
 }
 .pharm-dot.is-buffer {
   width: 10px;
@@ -387,13 +390,14 @@ html, body, #root { height: 100%; margin: 0; }
   box-shadow: 0 6px 18px rgba(27, 36, 48, 0.18);
   font-size: 12px;
   line-height: 1.35;
-  max-width: 220px;
+  max-width: 240px;
 }
 .pharm-pop b {
   display: block;
   margin-bottom: 2px;
 }
 .pharm-pop span {
+  display: block;
   color: #5c6570;
 }
 
