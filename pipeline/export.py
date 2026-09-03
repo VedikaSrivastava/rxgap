@@ -20,6 +20,7 @@ from pipeline.config import (
     H3_RESOLUTION,
     OVERTURE_RELEASE,
     PACES,
+    STUDY_AREA_LABEL,
     STUDY_CITIES,
     STUDY_PLACE_NAMES,
     WEB_DATA,
@@ -64,7 +65,7 @@ def exclude_reason(row) -> str | None:
     }:
         return str(row.exclude_reason)
     if not as_bool(row.in_study_area):
-        return "Outside Boston + Cambridge study area — shown for context"
+        return f"Outside {STUDY_AREA_LABEL} study area — shown for context"
     return "Not routable"
 
 
@@ -94,7 +95,8 @@ def run() -> None:
         "meta": {
             "title": "RxGap",
             "subtitle": "Pharmacy closure impact explorer",
-            "cities": list(STUDY_CITIES),
+            "areaLabel": demand.get("study_area_label") or STUDY_AREA_LABEL,
+            "cities": demand.get("cities") or list(STUDY_CITIES),
             "bufferKm": BUFFER_KM,
             "bbox": BBOX,
             "h3Resolution": H3_RESOLUTION,
@@ -105,8 +107,8 @@ def run() -> None:
             "acsYear": ACS_YEAR,
             "noVehicleHouseholds": demand.get("no_vehicle_households"),
             "noVehicleMoe": demand.get("no_vehicle_moe"),
-            "demand": "ACS 5-year no-vehicle households (B25044) with margins of error, allocated to residential-classified Overture buildings with block-group fallbacks, then aggregated to H3-9.",
-            "network": "Overture transportation segments joined on connector_id, pedestrian-accessible classes, 3 km buffer beyond city limits. Distances include origin and destination snap legs.",
+            "demand": "ACS 5-year no-vehicle households (B25044) with margins of error, allocated to residential-classified Overture buildings with block-group fallbacks, then aggregated to H3-9. Demand is clipped to MA cities and towns that intersect the analysis bbox.",
+            "network": "Overture transportation segments joined on connector_id, pedestrian-accessible classes, covering the analysis bbox. Distances include origin and destination snap legs.",
             "pharmacies": "Currently licensed MA Board Retail Pharmacies with usable geocodes in the analysis bbox. Walk-in storefronts are used for routing; excluded licenses still appear with a reason.",
             "reports": reports,
         },

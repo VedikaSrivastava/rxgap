@@ -34,7 +34,7 @@ export function TopBar({
     <header className="topbar">
       <div className="brand">
         <strong>RxGap</strong>
-        <span>Boston · Cambridge</span>
+        <span>{data.meta.areaLabel ?? data.meta.cities.join(" · ")}</span>
         <p>Pick a store and see who loses a short walk if it closes.</p>
       </div>
 

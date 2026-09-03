@@ -1,32 +1,44 @@
 # RxGap
 
-Pharmacy closure impact simulator for Boston and Cambridge.
+A pharmacy closure impact explorer for Greater Boston.
 
-**See how a pharmacy closure changes walkable access.**
+Pick a licensed walk-in pharmacy, simulate it closing, and see which no-vehicle households lose a reasonable walk — and how much farther the next licensed store is.
 
-Select a pharmacy, click **Simulate closure**, and the map shifts from today’s walkable coverage to the households that lose a 15-minute walk.
+## What it shows
 
-## Why this exists
+The map plots currently licensed retail pharmacies. Select one and click **Simulate closure**. Coverage then shifts from today’s nearest store to the next one, using a 15-minute walk as the default “too far” threshold.
 
-Boston and Cambridge have watched chain pharmacies close. A nearest-pharmacy map cannot answer the operational question: if this storefront shuts, which no-vehicle households lose a reasonable walk, and how much farther is the next licensed store?
+Headline impact is household-weighted: how many no-vehicle households lose a walk under the threshold, and the typical extra walk for households that used that store as their closest option. That is a modeled nearest-store result, not a claim about where people actually shop.
 
-Demand is clipped to Boston and Cambridge. The walk graph and candidate pharmacies extend 3 km beyond city limits so border neighborhoods are not artificially stranded. Only study-area pharmacies are selectable; buffer pharmacies can appear as nearest alternatives.
+Walk pace (slow / average / brisk) and the minute threshold can be changed in the app.
 
-## Sources
+## Who it's for
 
-| Layer | Authority |
-| --- | --- |
-| Currently licensed location | MA Board of Registration in Pharmacy, currently licensed *Retail Pharmacy* roster |
-| Pharmacy type | NPPES taxonomy `3336C0003X` (Community/Retail Pharmacy) |
-| Location / context | Overture places |
-| Walk network | Overture transportation `segment` topology via `connector_id` |
-| Demand | ACS 2023 5-year B25044 no-vehicle households, with MOEs, allocated to Overture buildings, then H3-9 |
+The main job is still “what happens if this store closes.” The same map is also a public picture of currently licensed walk-in pharmacies in Greater Boston, so other people can get something out of it without running a study.
 
-Build-specific source counts and validation checks are written to `data/reports/`. CMS Q1 2026 Retail Pharmacy Access is plan-level network adequacy, not a storefront directory.
+**Neighbors.** You do not need a GIS background. Click around your area to see which licensed walk-in pharmacies are on the map, which ones the model treats as closest for nearby households, and what the extra walk looks like if a familiar CVS or Walgreens shuts. That is useful when a closure is already in the news, or when you are trying to understand how thin coverage is on your side of a municipal line. It is not a live “pharmacy near me” app: there is no GPS pin, no hours, and no “open now.” For a trip today, still check the store. For “what is licensed to operate around here, and what if it left,” this is the map.
 
-Known closed storefronts (90 River St, 1329 Hyde Park Ave, 2275 Washington St, 416 Warren St) fail the pipeline if they re-enter as active.
+**Journalists and researchers.** A nearest-pharmacy dot map cannot answer the operational question. RxGap can: which no-vehicle households lose a 15-minute walk if this storefront closes, how much farther the next licensed store is, and how that closure ranks against others. Sources and methods are documented so the numbers can be checked.
 
-## Walking contract
+**Advocates and organizers.** Closures land unevenly. The tool is built around households without a car, which is the group most stuck with walking or transit. That is a way to talk about a specific store, a neighborhood, or a chain pullout without flattening the city into one average.
+
+**City, public health, and planning staff.** Use it to sanity-check a rumor, a license change, or a proposed closure against walkable access — including Brookline, Somerville, Chelsea, and other places people actually walk to, not only the Census Boston/Cambridge line.
+
+Anyone can also use it more lightly: search or click a store to read the address, see whether it is a public walk-in (some licensed sites are not), and notice clusters versus thin stretches. Treat that as a licensed-storefront atlas, not as medical advice or a substitute for calling the pharmacy.
+
+## Study area
+
+Demand and closable pharmacies cover every Massachusetts city and town that intersects the analysis window — Boston, Cambridge, Brookline, Somerville, Chelsea, Quincy, Newton, and their neighbors. Census city limits are not how people walk here, so abutting municipalities are first-class, not a buffer.
+
+The walk graph uses that same window so routes are not cut at a municipal line.
+
+## How it works
+
+**Pharmacies.** Operating status comes from the Massachusetts Board of Registration in Pharmacy currently licensed *Retail Pharmacy* roster. NPPES taxonomy `3336C0003X` is type evidence (community/retail), not proof the store is open. Mail-order, long-term care, and other non-walk-in licenses can still appear on the map with a reason; only walk-in storefronts that snap to the network can be closed in the tool.
+
+**Demand.** ACS 2023 5-year table B25044 (no-vehicle households, with margins of error) is allocated onto Overture buildings inside each block group, preferring residential buildings, then aggregated to [H3](https://h3geo.org/) resolution 9. The ACS block-group total is conserved.
+
+**Walking.** Routes use Overture transportation segments joined on `connector_id`. Shape coordinates measure length; they do not decide whether two segments connect. Distance is origin snap + graph path + destination snap.
 
 | Pace | Speed | Source |
 | --- | --- | --- |
@@ -34,24 +46,28 @@ Known closed storefronts (90 River St, 1329 Hyde Park Ave, 2275 Washington St, 4
 | Average | 3.0 mph *(default)* | Common FHWA pedestrian planning speed |
 | Brisk | 4.0 mph | Brisk adult walk |
 
-The access threshold is **15 minutes**. Route distance is origin snap + graph path + destination snap, using Overture connector IDs as junctions. Shape coordinates are used for length, not to decide whether two segments connect.
+## Data sources
 
-Headline extra-walk is a **household-weighted median** for hexes whose modeled nearest pharmacy was the closed location. That is not a claim about where people actually shop.
+| Layer | Source |
+| --- | --- |
+| Currently licensed location | MA Board of Registration in Pharmacy, retail roster |
+| Pharmacy type | NPPES taxonomy `3336C0003X` |
+| Buildings, places, walk network | [Overture Maps](https://overturemaps.org/) (release pinned in `pipeline/config.py`) |
+| Households without a vehicle | ACS 2023 5-year B25044 |
+| Municipal boundaries | Census TIGER/Line county subdivisions |
 
-## Stack
+CMS Retail Pharmacy Access files are plan-level network adequacy. They are not a storefront directory and are not used to plot stores.
 
-- Python pipeline: DuckDB against Overture GeoParquet, MA Board bulk license export, NPPES, ACS, H3
-- Vite + React + TypeScript + MapLibre frontend
-- Static artifact on Vercel (free)
+Build counts and checks are written to `data/reports/`.
 
 ## Run locally
+
+Python 3.11+ and Node.js 20+ are enough to run the app against the committed data artifact.
 
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -m pipeline.build --skip-cms
-python -m unittest discover -s tests
 
 cd web
 npm install
@@ -59,21 +75,31 @@ npm test
 npm run dev
 ```
 
-The pipeline writes `web/public/data/rxgap.json`. Re-run it when sources update.
+The UI is a Vite + React + MapLibre app. It reads `web/public/data/rxgap.json`.
+
+### Rebuild the data
+
+Re-run the pipeline when Board licenses, ACS, or the Overture release change.
+
+```bash
+python -m pipeline.build --skip-cms
+python -m unittest discover -s tests
+```
+
+That extracts Overture layers for the analysis window, geocodes licensed pharmacies, builds the walk graph, allocates demand, computes nearest and second-nearest stores, and writes `web/public/data/rxgap.json`.
+
+`--skip-cms` skips an optional CMS cross-check that is not required for the map.
 
 ## Deploy
 
-[Vercel](https://vercel.com) can host the frontend for free. Root `vercel.json` builds `web/` and publishes `web/dist`. Commit `web/public/data/rxgap.json` so the deployed app does not need the Python pipeline.
+[Vercel](https://vercel.com) can host the frontend. Root `vercel.json` builds `web/` and publishes `web/dist`. Commit `web/public/data/rxgap.json` so production does not need the Python pipeline.
 
-## Trade-offs
+## Limitations
 
-- Board retail licenses are the operating-status filter; NPPES active NPI status is not.
-- Demand uses residential-classified buildings within each block group, falls back to other buildings or a representative point where needed, and must conserve the ACS total.
-- Buffer pharmacies are used in shortest-path calculation but are not closable in the product.
-- Duplicate licenses for one storefront remain visible but only one identity participates in routing.
-- We model nearest / second-nearest licensed walk-in pharmacies, not observed shopping behavior.
-- ACS MOEs are pulled and reported at the block-group / citywide level; they are not allocated onto H3 cells.
+- Nearest and second-nearest licensed walk-in stores are modeled; observed shopping trips are not.
+- Board retail licenses are the operating-status filter. An active NPI is not treated as proof the storefront is open.
+- Duplicate licenses for one storefront remain visible; only one identity is used for routing.
+- ACS margins of error are kept at block-group and citywide level. They are not spread onto H3 cells.
+- Households at the outer edge of the extract window may have a nearer pharmacy just outside it.
 
-## Kill conditions
-
-If we cannot assemble a defensible currently licensed walk-in set, or the pedestrian graph does not connect Boston and Cambridge across the Charles, the project is not honest enough to ship. Spike reports live in `data/reports/`.
+The pipeline refuses to finish if a known-closed storefront is marked active, if demand allocation drops households, or if the pedestrian graph fails continuity checks (including Boston–Cambridge crossings of the Charles). Those reports live in `data/reports/`.

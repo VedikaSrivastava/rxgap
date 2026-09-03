@@ -1,9 +1,11 @@
+from types import SimpleNamespace
 import unittest
 
 import pandas as pd
+from shapely.geometry import Point, box
 
-from pipeline.demand import allocate_households
-
+from pipeline.demand import allocate_households, assign_city, display_cousub_name
+from pipeline.export import in_study_area
 
 class DemandAllocation(unittest.TestCase):
     def test_prefers_residential_per_block_group_and_preserves_mass(self):
@@ -28,6 +30,29 @@ class DemandAllocation(unittest.TestCase):
         self.assertIn("unknown", set(out["id"]))
         self.assertIn("block-group:c", set(out["id"]))
         self.assertAlmostEqual(out["hh"].sum(), 60.0)
+
+
+class CityAssignment(unittest.TestCase):
+    def test_prefers_municipality_containing_centroid(self):
+        cities = {"Boston": box(0, 0, 2, 2), "Brookline": box(2, 0, 4, 2)}
+        self.assertEqual(assign_city(Point(1, 1).buffer(0.1), cities), "Boston")
+        self.assertEqual(assign_city(Point(3, 1).buffer(0.1), cities), "Brookline")
+
+    def test_falls_back_to_largest_overlap(self):
+        cities = {"Boston": box(0, 0, 1, 1), "Brookline": box(2, 0, 3, 1)}
+        gap_spanning = box(0.8, 0.2, 2.6, 0.8)
+        self.assertEqual(assign_city(gap_spanning, cities), "Brookline")
+
+    def test_strips_census_town_suffix(self):
+        self.assertEqual(display_cousub_name("Watertown Town"), "Watertown")
+        self.assertEqual(display_cousub_name("Boston"), "Boston")
+
+
+class StudyAreaNames(unittest.TestCase):
+    def test_abutting_municipalities_count_as_study_area(self):
+        for city in ("Brookline", "Somerville", "Chelsea", "Quincy", "Newton"):
+            row = SimpleNamespace(city=city, lon=-71.1, lat=42.35)
+            self.assertTrue(in_study_area(row, None), city)
 
 
 if __name__ == "__main__":

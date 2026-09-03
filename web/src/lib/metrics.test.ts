@@ -8,7 +8,8 @@ const data: RxGapData = {
   meta: {
     title: "RxGap",
     subtitle: "",
-    cities: ["Boston", "Cambridge"],
+    cities: ["Boston", "Cambridge", "Somerville"],
+    areaLabel: "Greater Boston",
     bufferKm: 3,
     thresholdMinutes: 15,
     defaultPace: "average",
@@ -43,7 +44,7 @@ const data: RxGapData = {
       confidence: "high",
       inStudyArea: false,
       simulatable: false,
-      excludeReason: "Outside Boston + Cambridge study area",
+      excludeReason: "Outside Greater Boston study area",
     },
   ],
   hexes: [

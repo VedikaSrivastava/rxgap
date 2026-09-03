@@ -48,7 +48,7 @@ export function SidePanel({
             <div className="stat">
               <span>Closest store for</span>
               <b>{formatHh(served)}</b>
-              <p>no-vehicle households in Boston and Cambridge</p>
+              <p>no-vehicle households in {data.meta.areaLabel ?? "this area"}</p>
             </div>
             <p className="lead">
               If it closes, those households walk to the next licensed pharmacy. A walk
@@ -77,7 +77,7 @@ export function SidePanel({
             <div className="stat">
               <span>Impact rank</span>
               <b>#{rank.rank}</b>
-              <p>of {rank.of} Boston and Cambridge pharmacies we can close in the tool</p>
+              <p>of {rank.of} {data.meta.areaLabel ?? "study-area"} pharmacies we can close in the tool</p>
             </div>
           )}
           {stats.alternatives[0]?.pharmacy && (

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from shapely.geometry import box
+
 # Overture Maps release pinned for reproducibility.
 OVERTURE_RELEASE = "2026-08-19.0"
 OVERTURE_S3 = f"s3://overturemaps-us-west-2/release/{OVERTURE_RELEASE}"
@@ -12,39 +14,82 @@ OVERTURE_AZURE = (
     f"https://overturemapswestus2.blob.core.windows.net/release/{OVERTURE_RELEASE}"
 )
 
-# Demand is clipped to these municipalities. Pharmacies and the walk graph
-# extend 3 km beyond so border neighborhoods are not artificially stranded.
-STUDY_CITIES = ("Boston", "Cambridge")
-STUDY_PLACE_NAMES = frozenset(
-    {
-        "boston",
-        "cambridge",
-        "dorchester",
-        "roxbury",
-        "jamaica plain",
-        "brighton",
-        "allston",
-        "charlestown",
-        "hyde park",
-        "mattapan",
-        "roslindale",
-        "west roxbury",
-        "east boston",
-        "south boston",
-        "mission hill",
-        "roxbury crossing",
-    }
-)
+# Product copy. Demand and simulatable pharmacies use every MA city/town that
+# intersects BBOX — the same window pharmacies are already plotted in — because
+# the Census Boston/Cambridge line is not how people actually move.
+STUDY_AREA_LABEL = "Greater Boston"
+STUDY_CITIES = ("Boston", "Cambridge")  # fallback if a demand report is missing
 BUFFER_KM = 3.0
 
-# Union of Boston + Cambridge bounding boxes, then expanded by BUFFER_KM.
-# Used only as a cheap GeoParquet predicate; exact clipping uses city polygons.
+# Analysis window: Boston + Cambridge plus ~3 km. Demand, pharmacies, and the
+# walk graph all use this box. Exact municipal clipping uses county subdivisions.
 BBOX = {
     "xmin": -71.227,
     "ymin": 42.201,
     "xmax": -70.886,
     "ymax": 42.431,
 }
+
+# Board/NPPES "city" strings treated as local. Includes Boston neighborhoods
+# (often listed instead of Boston) and abutting municipalities in BBOX.
+LICENSE_CITY_ALIASES = (
+    "Boston",
+    "Cambridge",
+    "Brookline",
+    "Somerville",
+    "Newton",
+    "Watertown",
+    "Chelsea",
+    "Everett",
+    "Medford",
+    "Arlington",
+    "Belmont",
+    "Revere",
+    "Winthrop",
+    "Malden",
+    "Quincy",
+    "Milton",
+    "Dedham",
+    "Needham",
+    "Waltham",
+    "Westwood",
+    "Wellesley",
+    "Lexington",
+    "Winchester",
+    "Melrose",
+    "Saugus",
+    "Lynn",
+    "Nahant",
+    "Hull",
+    "Hingham",
+    "Weymouth",
+    "Braintree",
+    "Randolph",
+    "Canton",
+    "Dorchester",
+    "Roxbury",
+    "Jamaica Plain",
+    "Brighton",
+    "Allston",
+    "Charlestown",
+    "Hyde Park",
+    "Mattapan",
+    "Roslindale",
+    "West Roxbury",
+    "East Boston",
+    "South Boston",
+    "Mission Hill",
+    "Roxbury Crossing",
+    "Chestnut Hill",
+    "Boston College",
+    "Harvard Square",
+    "West Newton",
+    "Newton Center",
+    "Newton Highlands",
+    "Newtonville",
+    "Wollaston",
+)
+STUDY_PLACE_NAMES = frozenset(name.lower() for name in LICENSE_CITY_ALIASES)
 
 # Walking speeds are documented planning values, not a claim about who lives
 # in no-vehicle households. Default is Average.
@@ -149,6 +194,10 @@ class Pace:
 def pace(name: str = DEFAULT_PACE) -> Pace:
     row = PACES[name]
     return Pace(**row)
+
+
+def bbox_polygon():
+    return box(BBOX["xmin"], BBOX["ymin"], BBOX["xmax"], BBOX["ymax"])
 
 
 def ensure_dirs() -> None:

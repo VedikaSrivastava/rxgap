@@ -21,12 +21,13 @@ from pipeline.config import (
     DATA_REPORTS,
     EXCLUDE_TAXONOMIES,
     KNOWN_CLOSED_STOREFRONTS,
+    LICENSE_CITY_ALIASES,
     MA_ACTIVE_LICENSE_STATUSES,
     MA_LICENSE_API,
     MA_PHARMACY_BOARD,
     MA_RETAIL_EXPORT_PREFIX,
     RETAIL_TAXONOMY,
-    STUDY_CITIES,
+    STUDY_AREA_LABEL,
     ensure_dirs,
 )
 from pipeline.db import connect
@@ -55,39 +56,7 @@ STREET_RE = re.compile(
     r"(\d+[\w\s\-\.#]*(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Way|Drive|Dr|Place|Pl|Court|Ct|Lane|Ln|Parkway|Pkwy|Square|Sq|Highway|Hwy)(?:\s*(?:Ste|Suite|Unit|Rm|Room|#)\s*[\w\d\-]+)?)",
     re.I,
 )
-CITIES = (
-    "BOSTON",
-    "CAMBRIDGE",
-    "BROOKLINE",
-    "SOMERVILLE",
-    "NEWTON",
-    "WATERTOWN",
-    "CHELSEA",
-    "EVERETT",
-    "MEDFORD",
-    "ARLINGTON",
-    "BELMONT",
-    "REVERE",
-    "WINTHROP",
-    "MALDEN",
-    "QUINCY",
-    "DORCHESTER",
-    "ROXBURY",
-    "JAMAICA PLAIN",
-    "BRIGHTON",
-    "ALLSTON",
-    "CHARLESTOWN",
-    "HYDE PARK",
-    "MATTAPAN",
-    "ROSLINDALE",
-    "WEST ROXBURY",
-    "EAST BOSTON",
-    "SOUTH BOSTON",
-    "MISSION HILL",
-    "CHESTNUT HILL",
-    "BOSTON COLLEGE",
-    "HARVARD SQUARE",
-)
+CITIES = tuple(name.upper() for name in LICENSE_CITY_ALIASES)
 
 
 def taxonomy_codes(value) -> set[str]:
@@ -796,7 +765,7 @@ def run() -> pd.DataFrame:
         "overture_matched": int(board["overture_id"].notna().sum()),
         "nominatim_refined": int((board.get("loc_source") == "nominatim").sum()),
         "known_closed_active": 0,
-        "study_cities": list(STUDY_CITIES),
+        "study_area_label": STUDY_AREA_LABEL,
     }
     (DATA_REPORTS / "pharmacies.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     print(json.dumps(summary, indent=2))

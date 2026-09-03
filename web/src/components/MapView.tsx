@@ -119,8 +119,8 @@ export function MapView({
     const map = new maplibregl.Map({
       container: el,
       style: BASEMAP,
-      center: [-71.105, 42.36],
-      zoom: 12.1,
+      center: [-71.10, 42.345],
+      zoom: 11.4,
       maxZoom: MAX_ZOOM,
       attributionControl: { compact: true },
     });

@@ -13,17 +13,20 @@ import requests
 from shapely import wkt as shapely_wkt
 from shapely.geometry import mapping
 from shapely.ops import unary_union
+from shapely.prepared import prep
 
 from pipeline.config import (
     DATA_PROCESSED,
     DATA_RAW,
     DATA_REPORTS,
     H3_RESOLUTION,
+    STUDY_AREA_LABEL,
+    bbox_polygon,
     ensure_dirs,
 )
 from pipeline.db import connect
 
-TIGER_PLACE = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_25_place_500k.zip"
+TIGER_COUSUB = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_25_cousub_500k.zip"
 TIGER_BG = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_25_bg_500k.zip"
 ACS_B25044 = "https://www2.census.gov/programs-surveys/acs/summary_file/2023/table-based-SF/data/5YRData/acsdt5y2023-b25044.dat"
 
@@ -58,17 +61,55 @@ def _geom_col(con, shp: Path) -> str:
     return cols[-1]
 
 
+def display_cousub_name(name: str) -> str:
+    name = str(name).strip()
+    if name.lower().endswith(" town"):
+        return name[: -len(" town")].rstrip()
+    return name
+
+
+def assign_city(geom, cities: dict) -> str | None:
+    """Prefer the municipality containing the centroid; else largest overlap."""
+    centroid = geom.centroid
+    for name, city_geom in cities.items():
+        if centroid.within(city_geom) or centroid.within(city_geom.buffer(0.0001)):
+            return name
+    best_name, best_area = None, 0.0
+    for name, city_geom in cities.items():
+        if not geom.intersects(city_geom):
+            continue
+        area = geom.intersection(city_geom).area
+        if area > best_area:
+            best_name, best_area = name, area
+    return best_name
+
+
 def load_cities(con) -> dict:
-    shp = _shp_from_zip(_download(TIGER_PLACE, DATA_RAW / "cb_2023_25_place_500k.zip"))
+    """MA cities/towns that intersect the analysis bbox, clipped to that bbox."""
+    shp = _shp_from_zip(_download(TIGER_COUSUB, DATA_RAW / "cb_2023_25_cousub_500k.zip"))
     geom = _geom_col(con, shp)
     cities = con.execute(
         f"""
         SELECT NAME as name, ST_AsText({geom}) AS wkt
         FROM ST_Read('{shp.as_posix()}')
-        WHERE NAME IN ('Boston', 'Cambridge')
         """
     ).df()
-    geoms = {row["name"]: shapely_wkt.loads(row["wkt"]) for _, row in cities.iterrows()}
+    frame = bbox_polygon()
+    geoms: dict = {}
+    for row in cities.itertuples(index=False):
+        name = display_cousub_name(row.name)
+        if not name or "not defined" in name.lower():
+            continue
+        geom = shapely_wkt.loads(row.wkt)
+        if not geom.intersects(frame):
+            continue
+        clipped = geom.intersection(frame)
+        if clipped.is_empty:
+            continue
+        geoms[name] = unary_union([geoms[name], clipped]) if name in geoms else clipped
+    if not geoms:
+        raise RuntimeError("No county subdivisions intersect the analysis bbox")
+    print(f"Study municipalities in bbox: {len(geoms)} ({', '.join(sorted(geoms))})", flush=True)
     return geoms
 
 
@@ -104,24 +145,16 @@ def load_block_groups(con, cities: dict) -> pd.DataFrame:
         """
     ).df()
     union = unary_union(list(cities.values()))
+    hits = prep(union)
     keep = []
     for rec in bgs.itertuples(index=False):
         geom = shapely_wkt.loads(rec.wkt)
-        if not geom.intersects(union):
+        if not hits.intersects(geom):
             continue
         inter = geom.intersection(union)
         if inter.is_empty:
             continue
-        city = "Boston" if geom.centroid.within(cities["Boston"]) or (
-            geom.centroid.within(cities["Boston"].buffer(0.0001))
-        ) else None
-        if city is None and geom.intersects(cities["Cambridge"]):
-            if geom.centroid.within(cities["Cambridge"]) or geom.intersection(cities["Cambridge"]).area >= geom.intersection(cities["Boston"]).area:
-                city = "Cambridge"
-            else:
-                city = "Boston"
-        if city is None and geom.intersects(cities["Boston"]):
-            city = "Boston"
+        city = assign_city(geom, cities)
         if city is None:
             continue
         point = inter.representative_point()
@@ -240,6 +273,8 @@ def run() -> pd.DataFrame:
     )
 
     coverage = {
+        "study_area_label": STUDY_AREA_LABEL,
+        "cities": sorted(cities),
         "buildings_in_cities": int(len(buildings)),
         "residential_buildings": int(buildings["residential"].sum()) if "residential" in buildings.columns else int(len(res)),
         "residential_share": round(float(buildings["residential"].mean()), 3) if len(buildings) else 0,

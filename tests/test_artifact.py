@@ -24,8 +24,16 @@ class ArtifactContract(unittest.TestCase):
             "artifact should include every licensed pharmacy in the bbox",
         )
         self.assertGreater(len(study), 90, "study-area pharmacies should be exported")
-        self.assertTrue(any(not p["inStudyArea"] for p in data["pharmacies"]))
         self.assertTrue(any(not p["simulatable"] for p in data["pharmacies"]))
+        hex_cities = {row["city"] for row in data["hexes"]}
+        for name in ("Brookline", "Somerville", "Chelsea"):
+            self.assertIn(name, hex_cities, f"demand should include {name}")
+        self.assertTrue(
+            any(p["simulatable"] and "Somerville" in str(p["city"]) for p in data["pharmacies"])
+        )
+        self.assertTrue(
+            any(p["simulatable"] and "Brookline" in str(p["city"]) for p in data["pharmacies"])
+        )
         known = {
             "DS90294": (42.3656965, -71.0617268),
             "DS2636": (42.3620776, -71.0656249),

@@ -38,6 +38,7 @@ export type RxGapData = {
     title: string;
     subtitle: string;
     cities: string[];
+    areaLabel?: string;
     bufferKm: number;
     thresholdMinutes: number;
     defaultPace: PaceId;
