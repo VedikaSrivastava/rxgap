@@ -94,7 +94,7 @@ def run() -> None:
     payload = {
         "meta": {
             "title": "RxGap",
-            "subtitle": "Pharmacy closure impact explorer",
+            "subtitle": "Pharmacy permanent-closure impact explorer",
             "areaLabel": demand.get("study_area_label") or STUDY_AREA_LABEL,
             "cities": list(STUDY_MUNICIPALITIES),
             "bufferKm": BUFFER_KM,

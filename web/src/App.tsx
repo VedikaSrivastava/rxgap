@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IntroCard } from "./components/IntroCard";
 import { MapView } from "./components/MapView";
 import { SidePanel } from "./components/SidePanel";
 import { TopBar } from "./components/TopBar";
-import { formatHh, impact } from "./lib/metrics";
+import { hasSeenIntro, markIntroSeen, type IntroPhase } from "./lib/intro";
+import { exampleClosurePharmacy, formatHh, impact } from "./lib/metrics";
 import type { PaceId, RxGapData } from "./lib/types";
 
 export default function App() {
@@ -12,6 +14,10 @@ export default function App() {
   const [simulating, setSimulating] = useState(false);
   const [paceId, setPaceId] = useState<PaceId>("average");
   const [threshold, setThreshold] = useState(15);
+  const [introOpen, setIntroOpen] = useState(() => !hasSeenIntro());
+  const [introPhase, setIntroPhase] = useState<IntroPhase>("idle");
+  const [mapReady, setMapReady] = useState(false);
+  const [keyOpen, setKeyOpen] = useState(true);
 
   useEffect(() => {
     fetch("/data/rxgap.json")
@@ -27,16 +33,51 @@ export default function App() {
       .catch((err: Error) => setError(err.message));
   }, []);
 
+  const pace = data ? data.meta.paces[paceId] : null;
+  const example = useMemo(() => {
+    if (!data || !pace) return null;
+    return exampleClosurePharmacy(data, pace, threshold);
+  }, [data, pace, threshold]);
+
+  const aboutRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef(false);
+  const onMapReady = useCallback(() => setMapReady(true), []);
+
+  // Dismissing unmounts the focused card, so hand focus back to the About control.
+  useEffect(() => {
+    if (introOpen || !restoreFocusRef.current) return;
+    restoreFocusRef.current = false;
+    aboutRef.current?.focus();
+  }, [introOpen]);
+
   if (error) return <main className="boot">{error}</main>;
-  if (!data) return <main className="boot">Opening the map…</main>;
+  if (!data || !pace) return <main className="boot">Opening the map…</main>;
 
   const selected = data.pharmacies.find((p) => p.id === selectedId) ?? null;
-  const pace = data.meta.paces[paceId];
   const stats = impact(data, simulating ? selected?.id ?? null : null, pace, threshold);
   const altIds =
     selected && simulating
       ? stats.alternatives.map((a) => a.pharmacy?.id).filter((id): id is string => Boolean(id))
       : [];
+
+  const dismissIntro = (restoreFocus = true) => {
+    restoreFocusRef.current = restoreFocus;
+    markIntroSeen();
+    setIntroOpen(false);
+    setIntroPhase("idle");
+  };
+
+  const tryExample = () => {
+    if (!example) {
+      dismissIntro();
+      return;
+    }
+    setSelectedId(example.id);
+    setSimulating(false);
+    dismissIntro(false);
+  };
+
+  const area = data.meta.areaLabel ?? "this area";
 
   return (
     <div className="app">
@@ -45,6 +86,7 @@ export default function App() {
         selected={selected}
         paceId={paceId}
         threshold={threshold}
+        highlightMaxWalk={introOpen && introPhase === "maxWalk"}
         onSelect={(id) => {
           setSelectedId(id);
           setSimulating(false);
@@ -60,11 +102,21 @@ export default function App() {
           pace={pace}
           threshold={threshold}
           altIds={altIds}
+          pulseId={introOpen && introPhase === "pharmacy" ? example?.id ?? null : null}
+          onReady={onMapReady}
           onSelect={(id) => {
             setSelectedId(id);
             setSimulating(false);
           }}
         />
+        {introOpen && (
+          <IntroCard
+            onDismiss={() => dismissIntro()}
+            onTryExample={tryExample}
+            onPhase={setIntroPhase}
+            mapReady={mapReady}
+          />
+        )}
         {selected && (
           <SidePanel
             data={data}
@@ -80,45 +132,85 @@ export default function App() {
             }}
           />
         )}
-        {!selected && (
-          <p className="hint">Pick a pharmacy on the map, then simulate what happens if it closes.</p>
+        {!introOpen && (
+          <div className="map-footer">
+            <button
+              type="button"
+              className="about-rxgap"
+              ref={aboutRef}
+              onClick={() => setIntroOpen(true)}
+            >
+              ⓘ About RxGap
+            </button>
+          </div>
         )}
-        <div className="legend">
-          <span>
-            <i className="swatch cell walk" /> walkable
-          </span>
-          <span>
-            <i className="swatch cell beyond" /> already too far
-          </span>
-          {simulating && (
-            <span>
-              <i className="swatch cell coral" /> newly lost
-            </span>
-          )}
-          <span>
-            <i className="swatch ink" /> pharmacy
-          </span>
-          {simulating && (
-            <>
-              <span>
-                <i className="swatch coral" /> closing
-              </span>
-              <span>
-                <i className="swatch amber" /> next closest
-              </span>
-            </>
-          )}
-          <span>
-            <i className="swatch gray" /> can&apos;t simulate
-          </span>
-          <p>
-            Numbered circles are groups of stores — zoom in to see each one. A walk
-            over {threshold} min (≈{((threshold * pace.mph) / 60).toFixed(2)} mi of walking
-            at {pace.label.toLowerCase()} pace) counts as too far. Today, about{" "}
-            {formatHh(stats.alreadyHh)} no-vehicle households in{" "}
-            {data.meta.areaLabel ?? "this area"} are already past that.
-          </p>
-        </div>
+        {!introOpen &&
+          (keyOpen ? (
+            <div className="legend">
+              <div className="legend-top">
+                <h2>Map key</h2>
+                <button type="button" onClick={() => setKeyOpen(false)}>
+                  Hide <span aria-hidden="true">▲</span>
+                </button>
+              </div>
+
+              <div className="legend-group">
+                <h3>Neighborhoods, by what this permanent closure does to them</h3>
+                <ul>
+                  <li>
+                    <i className="swatch cell coral" /> Newly cut off — had a walkable pharmacy,
+                    now don&apos;t
+                  </li>
+                  <li>
+                    <i className="swatch cell walk" /> Still walkable — another pharmacy within{" "}
+                    {threshold} min
+                  </li>
+                  <li>
+                    <i className="swatch cell beyond" /> Already too far before this closure
+                  </li>
+                </ul>
+              </div>
+
+              <div className="legend-group is-ruled">
+                <h3>Pharmacy dots</h3>
+                <ul className="is-grid">
+                  <li>
+                    <i className="dot" /> Open
+                  </li>
+                  <li>
+                    <i className="dot is-picked" /> The one you picked
+                  </li>
+                  <li>
+                    <i className="dot is-closing" /> Permanently closing in this scenario
+                  </li>
+                  <li>
+                    <i className="dot is-next" /> Next closest option
+                  </li>
+                  <li className="is-quiet">
+                    <i className="dot is-outside" /> Outside the study area
+                  </li>
+                  <li className="is-quiet">
+                    <i className="dot is-excluded" /> Can&apos;t simulate
+                  </li>
+                </ul>
+              </div>
+
+              <div className="legend-read">
+                <p>
+                  <strong>Reading the map:</strong> a walk over {threshold} minutes counts as too
+                  far. Numbered circles are clusters of stores — zoom in to split them.
+                </p>
+                <p className="legend-read-note">
+                  {formatHh(stats.alreadyHh)} car-free households in {area} are already past that
+                  today.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="legend-show" onClick={() => setKeyOpen(true)}>
+              Map key <span aria-hidden="true">▼</span>
+            </button>
+          ))}
       </div>
     </div>
   );

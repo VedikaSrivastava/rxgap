@@ -1,17 +1,17 @@
+/** The three states the map key names, in the key's own colours. One hue means
+ *  one thing in both the before and after views, so the key never needs a caveat. */
+export const CELL_NEWLY_LOST = "#b4543e";
+export const CELL_WALKABLE = "#5f9e92";
+export const CELL_BEYOND = "#d8bcb2";
+
 export function minutesColor(
   minutes: number | null,
   threshold: number,
   newlyLost: boolean,
-  simulating: boolean,
 ): string {
-  if (newlyLost) return "#c4452d";
-  if (minutes == null) return simulating ? "#e4d5c8" : "#d4a090";
-  if (simulating) {
-    if (minutes <= threshold) return "#8fb8b2";
-    return "#e4d5c8";
-  }
-  if (minutes <= threshold) return "#3d8f86";
-  return "#d4a090";
+  if (newlyLost) return CELL_NEWLY_LOST;
+  if (minutes == null) return CELL_BEYOND;
+  return minutes <= threshold ? CELL_WALKABLE : CELL_BEYOND;
 }
 
 export function minutesOpacity(
@@ -36,7 +36,7 @@ export function hexFill(
 ) {
   const beyond = minutes == null || minutes > threshold;
   return {
-    color: minutesColor(minutes, threshold, newlyLost, simulating),
+    color: minutesColor(minutes, threshold, newlyLost),
     opacity: minutesOpacity(households, newlyLost, simulating, beyond),
   };
 }

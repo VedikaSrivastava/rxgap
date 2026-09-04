@@ -47,7 +47,9 @@ type Props = {
   pace: Pace;
   threshold: number;
   altIds: string[];
+  pulseId?: string | null;
   onSelect: (id: string) => void;
+  onReady?: () => void;
 };
 
 function hexRing(h3: string): number[][] {
@@ -140,7 +142,7 @@ function pharmacyCollection(
           role,
           roleLabel:
             role === "closed"
-              ? "Closing"
+              ? "Permanently closing"
               : role === "alt"
                 ? "Next closest"
                 : role === "excluded"
@@ -229,12 +231,16 @@ export function MapView({
   pace,
   threshold,
   altIds,
+  pulseId = null,
   onSelect,
+  onReady,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  const pulseRef = useRef<maplibregl.Marker | null>(null);
   const onSelectRef = useRef(onSelect);
+  const onReadyRef = useRef(onReady);
   const simulatingRef = useRef(simulating);
 
   const closedId = simulating ? selectedId : null;
@@ -256,10 +262,11 @@ export function MapView({
 
   useEffect(() => {
     onSelectRef.current = onSelect;
+    onReadyRef.current = onReady;
     simulatingRef.current = simulating;
     hexesRef.current = hexes;
     pharmaciesRef.current = pharmacies;
-  }, [onSelect, simulating, hexes, pharmacies]);
+  }, [onSelect, onReady, simulating, hexes, pharmacies]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -287,6 +294,22 @@ export function MapView({
     });
     popupRef.current = popup;
 
+    let alive = true;
+    let readySent = false;
+    let readyFallback = 0;
+    const signalReady = () => {
+      if (!alive || readySent) return;
+      readySent = true;
+      window.clearTimeout(readyFallback);
+      onReadyRef.current?.();
+    };
+    readyFallback = window.setTimeout(signalReady, 8000);
+    const waitUntilPainted = () => {
+      if (!alive) return;
+      map.once("idle", signalReady);
+      map.triggerRepaint();
+    };
+
     const addLayers = () => {
       if (!map.getSource("municipalities")) {
         map.addSource("municipalities", {
@@ -299,7 +322,7 @@ export function MapView({
             type: "line",
             source: "municipalities",
             paint: {
-              "line-color": "#1b2430",
+              "line-color": "#1b2431",
               "line-opacity": 0.18,
               "line-width": 1,
             },
@@ -322,7 +345,8 @@ export function MapView({
           })
           .catch(() => {
             // Outlines are contextual; map still works without them.
-          });
+          })
+          .finally(waitUntilPainted);
       }
       if (!map.getSource("hexes")) {
         map.addSource("hexes", { type: "geojson", data: hexesRef.current });
@@ -349,7 +373,7 @@ export function MapView({
             type: "line",
             source: "hexes",
             paint: {
-              "line-color": "#1b2430",
+              "line-color": "#1b2431",
               "line-opacity": [
                 "case",
                 ["boolean", ["feature-state", "hover"], false],
@@ -382,7 +406,7 @@ export function MapView({
           source: "pharmacies",
           filter: ["has", "point_count"],
           paint: {
-            "circle-color": "#1b2430",
+            "circle-color": "#1b2431",
             "circle-opacity": 0.85,
             "circle-stroke-width": 1.5,
             "circle-stroke-color": "#fff",
@@ -399,16 +423,16 @@ export function MapView({
               "match",
               ["get", "role"],
               "selected",
-              "#c4452d",
+              "#b4543e",
               "closed",
-              "#fff",
+              "#f7f8fa",
               "alt",
-              "#c4841a",
+              "#c99a2e",
               "buffer",
-              "#8a9199",
+              "#b8bec8",
               "excluded",
-              "#9aa3ad",
-              "#1b2430",
+              "#d5d8de",
+              "#1b2431",
             ],
             "circle-radius": [
               "case",
@@ -426,12 +450,14 @@ export function MapView({
               "match",
               ["get", "role"],
               "closed",
-              "#c4452d",
+              "#b4543e",
               "alt",
-              "#fffaf0",
+              "#fff",
+              "excluded",
+              "#b8bec8",
               "#fff",
             ],
-            "circle-opacity": ["match", ["get", "role"], "buffer", 0.55, "excluded", 0.8, 1],
+            "circle-opacity": ["match", ["get", "role"], "buffer", 0.55, "excluded", 0.9, 1],
           },
         });
         // Invisible larger target so pins win over hex fill under the cursor.
@@ -578,6 +604,8 @@ export function MapView({
     requestAnimationFrame(() => map.resize());
     mapRef.current = map;
     return () => {
+      alive = false;
+      window.clearTimeout(readyFallback);
       ro.disconnect();
       popup.remove();
       popupRef.current = null;
@@ -612,6 +640,30 @@ export function MapView({
       duration: 650,
     });
   }, [selectedId, data.pharmacies]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    pulseRef.current?.remove();
+    pulseRef.current = null;
+    if (!map || !pulseId) return;
+    const p = data.pharmacies.find((x) => x.id === pulseId);
+    if (!p) return;
+    // MapLibre positions a marker by writing `transform` on this element, so the
+    // animation has to live on a child — animating it here would clobber the translate.
+    const el = document.createElement("div");
+    el.className = "pharm-pulse";
+    el.setAttribute("aria-hidden", "true");
+    const ring = document.createElement("div");
+    ring.className = "pharm-pulse-ring";
+    el.appendChild(ring);
+    pulseRef.current = new maplibregl.Marker({ element: el, anchor: "center" })
+      .setLngLat([p.lon, p.lat])
+      .addTo(map);
+    return () => {
+      pulseRef.current?.remove();
+      pulseRef.current = null;
+    };
+  }, [pulseId, data.pharmacies]);
 
   return <div ref={rootRef} className="map" />;
 }

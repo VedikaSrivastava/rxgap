@@ -1,22 +1,25 @@
 # RxGap
 
-A pharmacy closure impact explorer for Greater Boston.
+
+A pharmacy permanent-closure impact explorer for Greater Boston.
 
 **Live demo:** [https://rxgap.vercel.app/](https://rxgap.vercel.app/)
 
-Pick a licensed walk-in pharmacy, set a **max walk**, simulate it closing, and see which no-vehicle households lose that walk — and how much farther the next licensed store is.
+![RxGap](RxGap.png)
+
+Pick a licensed walk-in pharmacy, set a **max walk**, simulate it permanently closing, and see which no-vehicle households lose that walk — and how much farther the next licensed store is.
 
 ## Why RxGap
 
-Boston has seen 41 pharmacy closures since 2018. In December 2025, the Boston City Council unanimously backed a petition asking Massachusetts to extend the required notice for permanent pharmacy closures from 14 days to 120 days, so communities and local officials would have time to respond. RxGap explores what that planning window could look like: select a licensed walk-in pharmacy, simulate its closure, and see which no-vehicle households lose a reasonable walk.
+Boston has seen 41 pharmacy closures since 2018. In December 2025, the Boston City Council unanimously backed a petition asking Massachusetts to extend the required notice for permanent pharmacy closures from 14 days to 120 days, so communities and local officials would have time to respond. RxGap explores what that planning window could look like: select a licensed walk-in pharmacy, simulate its permanent closure, and see which no-vehicle households lose a reasonable walk.
 
-The pressure is wider than one city. The Massachusetts Health Policy Commission counted nearly 370 pharmacy closures statewide since 2018, and found that 2024–2025 closures shifted into urban areas with low vehicle ownership. This 22-municipality study area has about **171,000** no-vehicle households (ACS 2023). At the default 15-minute max walk, about **18,000** of them are already beyond a licensed storefront — before anyone simulates a closure.
+The pressure is wider than one city. The Massachusetts Health Policy Commission counted nearly 370 pharmacy closures statewide since 2018, and found that 2024–2025 closures shifted into urban areas with low vehicle ownership. This 22-municipality study area has about **171,000** no-vehicle households (ACS 2023). At the default 15-minute max walk, about **18,000** of them are already beyond a licensed storefront — before anyone simulates a permanent closure.
 
 Sources: [Boston City Council petition coverage (MassLive)](https://www.masslive.com/boston/2025/12/boston-seeks-longer-notification-period-for-pharmacy-closures-to-stop-gaps-in-care.html); [GBH](https://www.wgbh.org/news/politics/2025-12-12/boston-asks-state-officials-for-more-notice-when-pharmacies-close); [HPC DataPoints 31](https://masshpc.gov/publications/datapoints-series/issue-31-when-closest-pharmacy-too-far-mapping-pharmacy-deserts). The 41-closure figure is Councilor Gabriela Coletta Zapata’s, as reported at the December 2025 hearing. The petition asks the state to change the notice rule; it is not itself the law.
 
 ## Who it's for
 
-Anyone who can click a pharmacy on a map. Neighbors and residents who heard their CVS is closing and want to know whether the next walk is still reasonable. Journalists and advocates who need a clearer picture than a list of remaining pins. Planning staff and local officials who may now get months of notice and need to see *who* loses access, not only *that* a store is closing.
+Anyone who can click a pharmacy on a map. Neighbors and residents who heard their CVS is permanently closing and want to know whether the next walk is still reasonable. Journalists and advocates who need a clearer picture than a list of remaining pins. Planning staff and local officials who may now get months of notice and need to see *who* loses access, not only *that* a store is permanently closing.
 
 It is not a “pharmacy near me” app, and it does not require a GIS background.
 
@@ -40,7 +43,7 @@ Demand and closable pharmacies exist only inside that municipal union. A **3 km 
 
 ## How it works
 
-The map shades H3 demand cells by whether a licensed storefront is within the max walk (default 15 minutes at a documented walking-speed assumption). Select a pharmacy and click **Simulate closure**. Newly lost cells turn coral. Changing max walk or the speed assumption recolors the map; demand-cell geometry does not change.
+The map shades H3 demand cells by whether a licensed storefront is within the max walk (default 15 minutes at a documented walking-speed assumption). Select a pharmacy and click **Simulate permanent closure**. Newly lost cells turn coral. Changing max walk or the speed assumption recolors the map; demand-cell geometry does not change.
 
 Headline impact is household-weighted: how many no-vehicle households lose a walk under the threshold, and the typical extra walk for households whose modeled nearest pharmacy is that location.
 
@@ -71,7 +74,7 @@ Build counts and checks are written to `data/reports/` (including `geography.jso
 
 ## Trade-offs and cuts
 
-The model is walk-only, license-only, and nearest-store only. That keeps the question honest: who loses a *walk* to a *currently licensed walk-in* if this storefront closes.
+The model is walk-only, license-only, and nearest-store only. That keeps the question honest: who loses a *walk* to a *currently licensed walk-in* if this storefront permanently closes.
 
 **Cut:** transit, driving, delivery/mail-order, insurance networks, medication availability, hours, and opening-location optimization.
 
